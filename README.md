@@ -41,6 +41,20 @@ Publishing your project on GitHub? Consider adding the **[#df-mc](https://github
 repository and opening a pull request at [df-wiki](https://github.com/df-mc/wiki) adding your project as a Community
 Project to improve its visibility.
 
+### Runtime resource pack replacement (fork)
+
+`Server.ReloadResources(packs)` replaces the packs offered to new connections
+without restarting the server. Active players must reconnect to negotiate the
+new packs. Concurrent reload calls are serialised across the supporting listeners;
+a connection negotiating during a reload may receive either snapshot.
+
+Custom listeners can implement `server.ResourceReloadingListener`. Wrappers must
+forward its `ReloadResources` method, or embed that capability when their wrapped
+listener supports it. Embedding only `server.Listener` hides the optional method.
+Implementations must snapshot the supplied slice and safely publish it to concurrent
+connections. A nil or empty slice clears the offered packs. The server returns an
+error if no listener supports replacement.
+
 ### Per-player swimming policy (fork)
 
 Swimming remains enabled by default. Set `[Players] DisableSwimming = true` in

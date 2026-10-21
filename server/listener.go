@@ -425,11 +425,12 @@ func (l *listener) Close() error {
 
 func newListener(conf Config) *listener {
 	l := &listener{}
-	l.reloadResources(conf.Resources)
+	l.ReloadResources(conf.Resources)
 	return l
 }
 
-func (l *listener) reloadResources(packs []*resource.Pack) {
+// ReloadResources implements ResourceReloadingListener.
+func (l *listener) ReloadResources(packs []*resource.Pack) {
 	cloned := slices.Clone(packs)
 	l.resources.Store(&cloned)
 }

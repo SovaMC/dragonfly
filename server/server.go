@@ -55,6 +55,9 @@ type Server struct {
 
 	listeners []Listener
 	incoming  chan incoming
+	// resourceReloadMu prevents concurrent reloads from leaving different
+	// resource pack generations on separate listeners.
+	resourceReloadMu sync.Mutex
 
 	pmu sync.RWMutex
 	// p holds a map of all players currently connected to the server. When they

@@ -379,6 +379,7 @@ func (l *listener) listenerConfig(conf Config) minecraft.ListenConfig {
 		TexturePacksRequired:   conf.ResourcesRequired,
 		Compression:            conf.Compression,
 		Allow:                  conf.Allower.Allow,
+		AcceptedProtocols:      conf.AcceptedProtocols,
 	}
 	cfg.FetchResourcePacks = func(_ login.IdentityData, data login.ClientData, _ []*resource.Pack) []*resource.Pack {
 		return compatibleResourcePacks(data.GameVersion, l.resourcePacks())

@@ -1522,6 +1522,11 @@ func debugShapeToProtocol(shape debug.Shape, dim world.Dimension, attachedEntity
 // Upstream only distinguished creative vs survival, so adventure and spectator
 // were sent as survival and the client kept the survival HUD/collision.
 func gameTypeFromMode(mode world.GameMode) int32 {
+	if t, ok := mode.(interface{ GameType() int32 }); ok {
+		// Server-defined game modes that are not registered with an ID report
+		// the client game type they build on themselves.
+		return t.GameType()
+	}
 	id, ok := world.GameModeID(mode)
 	if !ok {
 		return packet.GameTypeSurvival

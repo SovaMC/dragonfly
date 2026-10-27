@@ -3,9 +3,11 @@ package leveldat
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 )
@@ -51,10 +53,31 @@ func Read(r io.Reader) (*LevelDat, error) {
 // returns an error if dst was unable to store all properties found in the
 // level.dat.
 func (ld *LevelDat) Unmarshal(dst any) error {
-	if err := nbt.UnmarshalEncoding(ld.data, dst, nbt.LittleEndian); err != nil {
-		return fmt.Errorf("level.dat: decode nbt: %w", err)
+	data := ld.data
+	var fields map[string]any
+	for {
+		err := nbt.UnmarshalEncoding(data, dst, nbt.LittleEndian)
+		if err == nil {
+			return nil
+		}
+		var unknown nbt.UnexpectedNamedTagError
+		if !errors.As(err, &unknown) {
+			return fmt.Errorf("level.dat: decode nbt: %w", err)
+		}
+		if fields == nil {
+			if err := nbt.UnmarshalEncoding(ld.data, &fields, nbt.LittleEndian); err != nil {
+				return fmt.Errorf("level.dat: decode nbt: %w", err)
+			}
+		}
+		name := strings.TrimPrefix(unknown.TagName, ".")
+		if _, ok := fields[name]; !ok || strings.Contains(name, ".") {
+			return fmt.Errorf("level.dat: decode nbt: %w", err)
+		}
+		delete(fields, name)
+		if data, err = nbt.MarshalEncoding(fields, nbt.LittleEndian); err != nil {
+			return fmt.Errorf("level.dat: encode nbt: %w", err)
+		}
 	}
-	return nil
 }
 
 // Ver returns the version of the level.dat decoded, or 0 if ld is the empty

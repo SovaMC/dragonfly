@@ -258,9 +258,16 @@ func (s *Session) ViewEntityGameMode(e world.Entity) {
 	if !ok {
 		return
 	}
+	id := s.entityRuntimeID(c)
+	if id == selfEntityRuntimeID {
+		// The client resets its own abilities to the game type defaults on this
+		// packet, dropping abilities such as flight that SendGameMode granted
+		// just before. The own game type is already sent by SendGameMode.
+		return
+	}
 	s.writePacket(&packet.UpdatePlayerGameType{
 		GameType:       gameTypeFromMode(c.GameMode()),
-		PlayerUniqueID: int64(s.entityRuntimeID(c)),
+		PlayerUniqueID: int64(id),
 	})
 }
 

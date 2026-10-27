@@ -3,6 +3,7 @@ package chunk
 import (
 	"bytes"
 	"math"
+	"sync"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
 )
@@ -35,6 +36,23 @@ func newLightQueue(capacity int) *lightQueue {
 		capacity = 1
 	}
 	return &lightQueue{nodes: make([]lightNode, capacity)}
+}
+
+// lightQueuePool reuses light queues between lighting runs. Every chunk load
+// lights an area, and a fresh queue would otherwise be allocated and grown
+// for each of them.
+var lightQueuePool = sync.Pool{New: func() any { return newLightQueue(initialLightQueueCapacity) }}
+
+// acquireLightQueue returns an empty queue from the pool.
+func acquireLightQueue() *lightQueue {
+	q := lightQueuePool.Get().(*lightQueue)
+	q.head, q.tail, q.size = 0, 0, 0
+	return q
+}
+
+// releaseLightQueue returns a queue to the pool once a lighting run is done.
+func releaseLightQueue(q *lightQueue) {
+	lightQueuePool.Put(q)
 }
 
 // push appends a node to the tail, growing storage if full.
@@ -98,7 +116,8 @@ func LightArea(c []*Chunk, baseX, baseZ int) *lightArea {
 // individual chunks within the lightArea itself, without light crossing chunk borders.
 func (a *lightArea) Fill() {
 	a.initialiseLightSlices()
-	queue := newLightQueue(initialLightQueueCapacity)
+	queue := acquireLightQueue()
+	defer releaseLightQueue(queue)
 	a.insertBlockLightNodes(queue)
 	a.insertSkyLightNodes(queue)
 
@@ -111,7 +130,8 @@ func (a *lightArea) Fill() {
 // neighbouring chunks. The neighbouring chunks must have passed the light 'filling' stage before this
 // function is called for an lightArea that includes them.
 func (a *lightArea) Spread() {
-	queue := newLightQueue(initialLightQueueCapacity)
+	queue := acquireLightQueue()
+	defer releaseLightQueue(queue)
 	a.insertLightSpreadingNodes(queue, BlockLight)
 	a.insertLightSpreadingNodes(queue, SkyLight)
 

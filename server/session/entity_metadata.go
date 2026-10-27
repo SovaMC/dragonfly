@@ -102,6 +102,10 @@ func (s *Session) addSpecificMetadata(e any, m protocol.EntityMetadata) {
 	}
 	if sc, ok := e.(scaled); ok {
 		m[protocol.EntityDataKeyScale] = float32(sc.Scale())
+	} else if ent, ok := e.(*entity.Ent); ok {
+		if sc, ok := ent.Behaviour().(scaled); ok {
+			m[protocol.EntityDataKeyScale] = float32(sc.Scale())
+		}
 	}
 	if t, ok := e.(tnt); ok {
 		m[protocol.EntityDataKeyFuseTime] = int32(t.Fuse().Milliseconds() / 50)

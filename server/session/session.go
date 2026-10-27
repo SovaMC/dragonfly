@@ -94,6 +94,7 @@ type Session struct {
 	openedVirtualPair              atomic.Pointer[cube.Pos]
 	pendingVirtual                 atomic.Pointer[pendingVirtualWindow]
 	dispatchingVirtual             atomic.Pointer[pendingVirtualWindow]
+	virtualCloseGrace              atomic.Int64
 	windowAcknowledgement          bool
 	swingingArm                    atomic.Bool
 	changingSlot                   atomic.Bool

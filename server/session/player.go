@@ -76,6 +76,7 @@ func (s *Session) closeCurrentContainer(tx *world.Tx, clientRequested bool) {
 	}
 	s.pendingVirtual.Store(nil)
 	s.dispatchingVirtual.Store(nil)
+	s.virtualCloseGrace.Store(0)
 	if virtual {
 		s.ViewBlockUpdate(pos, tx.Block(pos), 0)
 		if pair != nil {
@@ -177,7 +178,22 @@ const minProtocolWindowAcknowledgement = 594
 const (
 	virtualWindowRetryInterval = time.Second / 20
 	virtualWindowRetries       = 20
+	// virtualWindowCloseGrace is how long the client may still answer excess
+	// re-sent windows with a ContainerClose for window 0xff after the last one.
+	virtualWindowCloseGrace = time.Second
 )
+
+// extendVirtualCloseGrace ignores client ContainerClose packets for window
+// 0xff until the grace period after now has passed.
+func (s *Session) extendVirtualCloseGrace() {
+	s.virtualCloseGrace.Store(time.Now().Add(virtualWindowCloseGrace).UnixNano())
+}
+
+// ignoresVirtualClose reports whether a client ContainerClose for window 0xff
+// belongs to the dispatch of a virtual window rather than a real close.
+func (s *Session) ignoresVirtualClose() bool {
+	return s.pendingVirtual.Load() != nil || s.dispatchingVirtual.Load() != nil || time.Now().UnixNano() < s.virtualCloseGrace.Load()
+}
 
 // resendVirtualWindow re-opens a virtual window every tick until the client
 // reports a duplicate open, proving the window is open client-side, as the
@@ -196,6 +212,7 @@ func (s *Session) resendVirtualWindow(pending *pendingVirtualWindow) {
 		}
 		s.writePacket(&packet.ContainerClose{WindowID: pending.id, ContainerType: byte(protocol.ContainerTypeContainer)})
 		s.writeVirtualWindow(pending)
+		s.extendVirtualCloseGrace()
 	}
 	if s.dispatchingVirtual.CompareAndSwap(pending, nil) {
 		s.sendInv(pending.inv, uint32(pending.id))
@@ -206,6 +223,7 @@ func (s *Session) resendVirtualWindow(pending *pendingVirtualWindow) {
 // once the client proved it is open.
 func (s *Session) acknowledgeVirtualWindow() {
 	if pending := s.dispatchingVirtual.Load(); pending != nil && s.dispatchingVirtual.CompareAndSwap(pending, nil) {
+		s.extendVirtualCloseGrace()
 		s.sendInv(pending.inv, uint32(pending.id))
 	}
 }

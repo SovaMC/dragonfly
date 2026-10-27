@@ -92,6 +92,7 @@ type Session struct {
 	openedWindow                   atomic.Pointer[inventory.Inventory]
 	openedPos                      atomic.Pointer[cube.Pos]
 	openedVirtualPair              atomic.Pointer[cube.Pos]
+	pendingVirtual                 atomic.Pointer[pendingVirtualWindow]
 	swingingArm                    atomic.Bool
 	changingSlot                   atomic.Bool
 	clientItemUsePrediction        atomic.Pointer[clientItemUsePrediction]
@@ -783,6 +784,7 @@ func (s *Session) registerHandlers() {
 		packet.IDPlayerAction:              &PlayerActionHandler{},
 		packet.IDPlayerAuthInput:           &PlayerAuthInputHandler{},
 		packet.IDPlayerSkin:                &PlayerSkinHandler{},
+		packet.IDNetworkStackLatency:       &NetworkStackLatencyHandler{},
 		packet.IDRequestAbility:            &RequestAbilityHandler{},
 		packet.IDRequestChunkRadius:        &RequestChunkRadiusHandler{},
 		packet.IDRespawn:                   &RespawnHandler{},

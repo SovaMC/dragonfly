@@ -74,6 +74,7 @@ func (s *Session) closeCurrentContainer(tx *world.Tx, clientRequested bool) {
 	if !s.closeWindow(clientRequested) {
 		return
 	}
+	s.pendingVirtual.Store(nil)
 	if virtual {
 		s.ViewBlockUpdate(pos, tx.Block(pos), 0)
 		if pair != nil {
@@ -120,13 +121,42 @@ func (s *Session) OpenInventory(inv *inventory.Inventory, title string, pos cube
 	inv.SlotFunc(func(slot int, _ item.Stack, after item.Stack) {
 		s.ViewSlotChange(slot, after)
 	})
+
+	// The client silently refuses to open a window on a block it has not
+	// processed yet, so the window is only opened once the client answers a
+	// latency request sent after the fake chest, or after a timeout.
+	pending := &pendingVirtualWindow{id: nextID, inv: inv, pos: pos}
+	s.pendingVirtual.Store(pending)
+	s.writePacket(&packet.NetworkStackLatency{Timestamp: time.Now().UnixNano(), NeedsResponse: true})
+	time.AfterFunc(virtualWindowTimeout, func() { s.openVirtualWindow(pending) })
+}
+
+// virtualWindowTimeout is how long a virtual window waits for the client to
+// acknowledge its fake container block before it is opened regardless.
+const virtualWindowTimeout = time.Second
+
+// pendingVirtualWindow is a virtual window whose fake container block was sent
+// but which has not been opened client-side yet.
+type pendingVirtualWindow struct {
+	id  byte
+	inv *inventory.Inventory
+	pos cube.Pos
+}
+
+// openVirtualWindow opens a pending virtual window if it is still the current
+// one. It is called at most once per window.
+func (s *Session) openVirtualWindow(pending *pendingVirtualWindow) {
+	if !s.pendingVirtual.CompareAndSwap(pending, nil) || s.openedWindow.Load() != pending.inv {
+		return
+	}
+	pos := pending.pos
 	s.writePacket(&packet.ContainerOpen{
-		WindowID:                nextID,
+		WindowID:                pending.id,
 		ContainerType:           protocol.ContainerTypeContainer,
 		ContainerPosition:       protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])},
 		ContainerEntityUniqueID: -1,
 	})
-	s.sendInv(inv, uint32(nextID))
+	s.sendInv(pending.inv, uint32(pending.id))
 }
 
 // CloseInventory closes the currently opened container from the server side.

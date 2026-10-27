@@ -2991,7 +2991,9 @@ func (p *Player) OpenBlockContainer(pos cube.Pos, tx *world.Tx) {
 // OpenInventory opens an arbitrary server-side inventory as a container.
 func (p *Player) OpenInventory(inv *inventory.Inventory, title string, tx *world.Tx) {
 	if p.session() != session.Nop {
-		pos := cube.PosFromVec3(p.Position()).Side(cube.FaceUp).Side(cube.FaceUp)
+		// The fake container is placed below the player, where the client does
+		// not see it, as the PocketMine InvMenu library does.
+		pos := cube.PosFromVec3(p.Position()).Side(cube.FaceDown).Side(cube.FaceDown)
 		p.session().OpenInventory(inv, title, pos, tx)
 	}
 }

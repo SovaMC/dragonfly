@@ -850,6 +850,12 @@ func (p *Player) KnockBack(src mgl64.Vec3, force, height float64) {
 	if p.Dead() || !p.GameMode().AllowsTakingDamage() {
 		return
 	}
+	if h, ok := p.Handler().(KnockBackHandler); ok {
+		ctx := NewEventContext(p.tx, p)
+		if h.HandleKnockBack(ctx, src, force, height); ctx.Cancelled() {
+			return
+		}
+	}
 	p.knockBack(src, force, height)
 }
 

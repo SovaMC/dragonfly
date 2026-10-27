@@ -160,6 +160,13 @@ type Handler interface {
 	HandleDiagnostics(p *Player, d session.Diagnostics)
 }
 
+// KnockBackHandler may be implemented by a Handler to replace knockback that is
+// applied through Player.KnockBack, such as knockback from projectiles.
+// Calling ctx.Cancel() suppresses the default knockback.
+type KnockBackHandler interface {
+	HandleKnockBack(ctx *Context, src mgl64.Vec3, force, height float64)
+}
+
 // AttackKnockBackHandler may be implemented by a Handler to replace the
 // knockback applied after a successful entity attack. HandleAttackKnockBack is
 // called after damage was accepted and before feedback for the attack is

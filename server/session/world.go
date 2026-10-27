@@ -220,8 +220,8 @@ func (s *Session) ViewEntity(e world.Entity) {
 			metadata[protocol.EntityDataKeyVariant] = int32(s.br.BlockRuntimeID(v.Behaviour().(*entity.FallingBlockBehaviour).Block()))
 		}
 	}
-	if v, ok := e.(*entity.Ent); ok {
-		if provider, ok := v.Behaviour().(NetworkEncodeableEntityBehaviour); ok {
+	if b, ok := entityBehaviour(e); ok {
+		if provider, ok := b.(NetworkEncodeableEntityBehaviour); ok {
 			id = provider.NetworkEncodeEntity()
 		}
 	}

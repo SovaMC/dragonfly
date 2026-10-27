@@ -38,7 +38,8 @@ func (e *Ent) H() *world.EntityHandle {
 }
 
 func (e *Ent) Behaviour() Behaviour {
-	return e.data.Data.(Behaviour)
+	b, _ := e.data.Data.(Behaviour)
+	return b
 }
 
 // Explode propagates the explosion behaviour of the underlying Behaviour.

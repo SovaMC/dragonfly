@@ -37,8 +37,8 @@ func (s *Session) parseEntityMetadata(e world.Entity) protocol.EntityMetadata {
 		m.SetFlag(protocol.EntityDataKeyFlags, protocol.EntityDataFlagLingering)
 	}
 	s.addSpecificMetadata(e, m)
-	if ent, ok := e.(*entity.Ent); ok {
-		s.addSpecificMetadata(ent.Behaviour(), m)
+	if b, ok := entityBehaviour(e); ok {
+		s.addSpecificMetadata(b, m)
 	}
 	return m
 }
@@ -102,8 +102,8 @@ func (s *Session) addSpecificMetadata(e any, m protocol.EntityMetadata) {
 	}
 	if sc, ok := e.(scaled); ok {
 		m[protocol.EntityDataKeyScale] = float32(sc.Scale())
-	} else if ent, ok := e.(*entity.Ent); ok {
-		if sc, ok := ent.Behaviour().(scaled); ok {
+	} else if b, ok := entityBehaviour(e); ok {
+		if sc, ok := b.(scaled); ok {
 			m[protocol.EntityDataKeyScale] = float32(sc.Scale())
 		}
 	}
@@ -287,6 +287,17 @@ type scoreTag interface {
 type endCrystal interface {
 	ShowBase() bool
 	BeamTarget() (cube.Pos, bool)
+}
+
+// entityBehaviour returns the behaviour of e if it is an entity.Ent or a type
+// embedding one, such as a server-defined wrapper around entity.Ent.
+func entityBehaviour(e any) (entity.Behaviour, bool) {
+	b, ok := e.(interface{ Behaviour() entity.Behaviour })
+	if !ok {
+		return nil, false
+	}
+	behaviour := b.Behaviour()
+	return behaviour, behaviour != nil
 }
 
 type splash interface {

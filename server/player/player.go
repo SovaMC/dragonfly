@@ -1373,7 +1373,9 @@ func (p *Player) StartFlying() {
 		return
 	}
 	p.flying = true
-	p.session().SendGameMode(p)
+	// Only the abilities change: resending the game type makes the client reset
+	// its abilities to the game type defaults, which drops flight in adventure.
+	p.session().SendAbilities(p)
 }
 
 // Flying checks if the player is currently flying.
@@ -1388,7 +1390,7 @@ func (p *Player) StopFlying() {
 		return
 	}
 	p.flying = false
-	p.session().SendGameMode(p)
+	p.session().SendAbilities(p)
 }
 
 // Jump makes the player jump if they are on ground. It exhausts the player by 0.05 food points, an additional 0.15

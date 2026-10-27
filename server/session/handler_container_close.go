@@ -25,6 +25,11 @@ func (h *ContainerCloseHandler) Handle(p packet.Packet, s *Session, tx *world.Tx
 		c.ContainerClosed()
 	case 0xff:
 		// Sent when an inventory/container is opened at the same time as chat.
+		if s.pendingVirtual.Load() != nil || s.dispatchingVirtual.Load() != nil {
+			// 1.20+ clients also send this while a closing form swallows the
+			// ContainerOpen of a virtual window that is still being dispatched.
+			return nil
+		}
 		s.invOpened = false
 		if s.containerOpened.Load() {
 			s.closeCurrentContainer(tx, false)

@@ -75,6 +75,7 @@ func (s *Session) closeCurrentContainer(tx *world.Tx, clientRequested bool) {
 		return
 	}
 	s.pendingVirtual.Store(nil)
+	s.dispatchingVirtual.Store(nil)
 	if virtual {
 		s.ViewBlockUpdate(pos, tx.Block(pos), 0)
 		if pair != nil {
@@ -149,6 +150,16 @@ func (s *Session) openVirtualWindow(pending *pendingVirtualWindow) {
 	if !s.pendingVirtual.CompareAndSwap(pending, nil) || s.openedWindow.Load() != pending.inv {
 		return
 	}
+	s.writeVirtualWindow(pending)
+	s.sendInv(pending.inv, uint32(pending.id))
+	if s.windowAcknowledgement {
+		s.dispatchingVirtual.Store(pending)
+		go s.resendVirtualWindow(pending)
+	}
+}
+
+// writeVirtualWindow sends the ContainerOpen packet of a virtual window.
+func (s *Session) writeVirtualWindow(pending *pendingVirtualWindow) {
 	pos := pending.pos
 	s.writePacket(&packet.ContainerOpen{
 		WindowID:                pending.id,
@@ -156,7 +167,47 @@ func (s *Session) openVirtualWindow(pending *pendingVirtualWindow) {
 		ContainerPosition:       protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])},
 		ContainerEntityUniqueID: -1,
 	})
-	s.sendInv(pending.inv, uint32(pending.id))
+}
+
+// minProtocolWindowAcknowledgement is the first protocol (1.20.0) whose
+// clients may drop a ContainerOpen, for example while a form is closing, and
+// report a duplicate ContainerOpen with a PacketViolationWarning instead.
+const minProtocolWindowAcknowledgement = 594
+
+const (
+	virtualWindowRetryInterval = time.Second / 20
+	virtualWindowRetries       = 20
+)
+
+// resendVirtualWindow re-opens a virtual window every tick until the client
+// reports a duplicate open, proving the window is open client-side, as the
+// PocketMine InvMenu library does.
+func (s *Session) resendVirtualWindow(pending *pendingVirtualWindow) {
+	ticker := time.NewTicker(virtualWindowRetryInterval)
+	defer ticker.Stop()
+	for range virtualWindowRetries {
+		select {
+		case <-s.closeBackground:
+			return
+		case <-ticker.C:
+		}
+		if s.dispatchingVirtual.Load() != pending || s.openedWindow.Load() != pending.inv {
+			return
+		}
+		s.writePacket(&packet.ContainerClose{WindowID: pending.id, ContainerType: byte(protocol.ContainerTypeContainer)})
+		s.writeVirtualWindow(pending)
+	}
+	if s.dispatchingVirtual.CompareAndSwap(pending, nil) {
+		s.sendInv(pending.inv, uint32(pending.id))
+	}
+}
+
+// acknowledgeVirtualWindow ends the dispatch of the current virtual window
+// once the client proved it is open.
+func (s *Session) acknowledgeVirtualWindow() {
+	if pending := s.dispatchingVirtual.Load(); pending != nil && s.dispatchingVirtual.CompareAndSwap(pending, nil) {
+		s.sendInv(pending.inv, uint32(pending.id))
+	}
 }
 
 // CloseInventory closes the currently opened container from the server side.

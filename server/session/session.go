@@ -93,6 +93,8 @@ type Session struct {
 	openedPos                      atomic.Pointer[cube.Pos]
 	openedVirtualPair              atomic.Pointer[cube.Pos]
 	pendingVirtual                 atomic.Pointer[pendingVirtualWindow]
+	dispatchingVirtual             atomic.Pointer[pendingVirtualWindow]
+	windowAcknowledgement          bool
 	swingingArm                    atomic.Bool
 	changingSlot                   atomic.Bool
 	clientItemUsePrediction        atomic.Pointer[clientItemUsePrediction]
@@ -262,6 +264,7 @@ func (conf Config) New(conn Conn) *Session {
 		debugShapes:            make(map[int]debug.Shape),
 		debugShapeUpdates:      make([]debugShapeUpdate, 0, 256),
 		chunkEncoding:          networkEncoding,
+		windowAcknowledgement:  networkProtocol == nil || networkProtocol.ID() >= minProtocolWindowAcknowledgement,
 	}
 	s.viewLayer = world.NewViewLayer(s)
 	s.openedWindow.Store(inventory.New(1, nil))
@@ -785,6 +788,7 @@ func (s *Session) registerHandlers() {
 		packet.IDPlayerAuthInput:           &PlayerAuthInputHandler{},
 		packet.IDPlayerSkin:                &PlayerSkinHandler{},
 		packet.IDNetworkStackLatency:       &NetworkStackLatencyHandler{},
+		packet.IDPacketViolationWarning:    &PacketViolationWarningHandler{},
 		packet.IDRequestAbility:            &RequestAbilityHandler{},
 		packet.IDRequestChunkRadius:        &RequestChunkRadiusHandler{},
 		packet.IDRespawn:                   &RespawnHandler{},

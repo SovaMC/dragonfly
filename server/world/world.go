@@ -1217,6 +1217,24 @@ func (w *World) Save() {
 	<-w.exec(w.save(w.saveChunk))
 }
 
+// Persist saves all modified chunks and level.dat values to the World's
+// provider, even if the World is read-only. It must not be called from a
+// transaction of the World.
+func (w *World) Persist() {
+	<-w.exec(func(tx *Tx) {
+		for pos, c := range w.chunks {
+			if !c.modified {
+				continue
+			}
+			c.Compact()
+			if err := w.conf.Provider.StoreColumn(pos, w.conf.Dim, w.columnTo(c, pos)); err != nil {
+				w.conf.Log.Error("persist chunk: "+err.Error(), "X", pos[0], "Z", pos[1])
+			}
+		}
+		w.conf.Provider.SaveSettings(w.set)
+	})
+}
+
 // save saves all loaded chunks to the World's provider.
 func (w *World) save(f func(*Tx, ChunkPos, *Column)) execFunc {
 	return func(tx *Tx) {

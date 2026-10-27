@@ -64,6 +64,9 @@ type ProjectileBehaviourConfig struct {
 	// collision are processed. It may add presentation such as a trail, but
 	// must not retain e or tx after it returns.
 	Tick func(e *Ent, tx *world.Tx)
+	// Collides may be set to filter the entities the projectile can collide
+	// with. If it returns false for an entity, the projectile passes through it.
+	Collides func(e *Ent, tx *world.Tx, other world.Entity) bool
 	// SurviveBlockCollision specifies if a projectile with this
 	// ProjectileBehaviour should survive collision with a block. If set to
 	// false, the projectile will break when hitting a block (like a snowball).
@@ -383,6 +386,9 @@ func (lt *ProjectileBehaviour) ignores(e *Ent) trace.EntityFilter {
 				owner := e.data.Age < time.Second/4 && lt.conf.Owner == other.H()
 				collidedEntity := slices.Contains(lt.collidedEntities, other.H())
 				if spectator || itself || !damageable || owner || collidedEntity {
+					continue
+				}
+				if lt.conf.Collides != nil && !lt.conf.Collides(e, e.tx, other) {
 					continue
 				}
 				if !yield(other) {

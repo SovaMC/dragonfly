@@ -355,6 +355,15 @@ func (br *BasicBlockRegistry) Finalize() {
 		}
 		return fnv1.HashString64(nameOne) < fnv1.HashString64(nameTwo)
 	})
+	// Zero is ItemStack's no-block sentinel. Keep air at local zero; native
+	// connections use network hashes and historical adapters own target IDs.
+	for i, b := range br.blocks {
+		name, _ := b.EncodeBlock()
+		if name == "minecraft:air" {
+			br.blocks[0], br.blocks[i] = br.blocks[i], br.blocks[0]
+			break
+		}
+	}
 
 	br.blockInfos = make([]blockInfo, len(br.blocks))
 	br.hashes = intintmap.New(len(br.blocks), 0.999)

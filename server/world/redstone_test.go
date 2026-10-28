@@ -126,6 +126,27 @@ func TestRedstoneStepFace(t *testing.T) {
 	}
 }
 
+func TestShapeUpdatesPreserveCachedRedstonePower(t *testing.T) {
+	for _, disabled := range []bool{false, true} {
+		w := Config{Synchronous: true, Blocks: disabledRedstoneTestRegistry(), DisableRedstoneTick: disabled}.New()
+		runWorld(w, func(tx *Tx) {
+			pos := cube.Pos{8, 64, 8}
+			b := disabledRedstoneTestBlock{}
+			tx.SetBlock(pos, b, nil)
+			w.redstone.power[pos] = 9
+			tx.SetBlock(pos, b, &SetOpts{KeepRedstonePower: true})
+			if got := w.redstone.power[pos]; got != 9 {
+				t.Errorf("disabled=%v: shape update lost cached power: %d", disabled, got)
+			}
+			tx.SetBlock(pos, b, nil)
+			if got := w.redstone.power[pos]; !disabled && got != 0 {
+				t.Errorf("ordinary update retained stale cached power: %d", got)
+			}
+		})
+		_ = w.Close()
+	}
+}
+
 func TestRedstoneTorchBurnoutRecoveryUsesRollingWindow(t *testing.T) {
 	e := newRedstoneEngine(0)
 	pos := cube.Pos{1, 64, 1}

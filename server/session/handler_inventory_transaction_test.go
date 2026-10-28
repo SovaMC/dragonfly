@@ -5,9 +5,34 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/item/inventory"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func TestOffhandTransactionsDoNotUseMainHand(t *testing.T) {
+	for _, hand := range []byte{protocol.HandSlotOffHand, 255} {
+		for _, data := range []protocol.InventoryTransactionData{
+			&protocol.UseItemOnEntityTransactionData{Hand: hand, HotBarSlot: 99},
+			&protocol.ReleaseItemTransactionData{Hand: hand, HotBarSlot: 99},
+		} {
+			s := &Session{
+				inv: inventory.New(36, nil), ui: inventory.New(54, nil), offHand: inventory.New(1, nil),
+				armour: inventory.NewArmour(nil), packets: make(chan outboundMessage, 4), closeBackground: make(chan struct{}),
+			}
+			// A nil controllable and invalid main-hand slot must never be reached.
+			err := (&InventoryTransactionHandler{}).Handle(&packet.InventoryTransaction{TransactionData: data}, s, nil, nil)
+			if hand == protocol.HandSlotOffHand {
+				if err != nil || len(s.packets) != 4 {
+					t.Fatalf("%T offhand: err=%v resync packets=%d", data, err, len(s.packets))
+				}
+			} else if err == nil || len(s.packets) != 0 {
+				t.Fatalf("%T invalid hand: err=%v packets=%d", data, err, len(s.packets))
+			}
+		}
+	}
+}
 
 func TestRepeatedRightClickSignature(t *testing.T) {
 	h := &InventoryTransactionHandler{}

@@ -1321,7 +1321,6 @@ func protocolToSkin(sk protocol.Skin) (s skin.Skin, err error) {
 	s.Persona = sk.PersonaSkin
 	s.Pix = sk.SkinData
 	s.Model = sk.SkinGeometry
-	s.PlayFabID = sk.PlayFabID
 	s.FullID = sk.FullID
 	s.Premium = sk.PremiumSkin
 	s.PersonaCapeOnClassic = sk.PersonaCapeOnClassicSkin

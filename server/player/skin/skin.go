@@ -13,9 +13,8 @@ import (
 type Skin struct {
 	w, h int
 	// Persona specifies if the skin uses the persona skin system.
-	Persona   bool
-	PlayFabID string
-	FullID    string
+	Persona bool
+	FullID  string
 	// Premium specifies if the skin originates from paid Marketplace content.
 	Premium bool
 	// PersonaCapeOnClassic specifies if a persona cape is equipped on a classic skin.

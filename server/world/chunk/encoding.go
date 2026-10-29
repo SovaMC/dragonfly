@@ -153,8 +153,8 @@ func (bpe BlockPaletteEncoding) DecodeBlockState(m map[string]any) (uint32, erro
 	// shared globally, so always detach the decoded state before upgrading it.
 	state = maps.Clone(state)
 
-	// The upgrade below adds properties to the map in place, so its size is
-	// taken first to find out if it did so.
+	// The upgrade below may add properties, so the stored count is taken
+	// first to find out if it did.
 	stored := len(state)
 	upgraded := blockupgrader.Upgrade(blockupgrader.BlockState{
 		Name:       name,
@@ -204,18 +204,20 @@ func legacyBlockMeta(value any) (int16, bool) {
 // properties the same way when it loads a state that was saved before they
 // existed. The properties passed are left unchanged.
 func (bpe BlockPaletteEncoding) fillDefaults(name string, properties map[string]any) (map[string]any, bool) {
-	defaults, ok := bpe.Blocks.DefaultProperties(name)
-	if !ok || len(properties) >= len(defaults) {
-		return properties, false
-	}
-	filled := maps.Clone(properties)
-	if filled == nil {
-		filled = make(map[string]any, len(defaults))
-	}
+	defaults, _ := bpe.Blocks.DefaultProperties(name)
+	var filled map[string]any
 	for k, v := range defaults {
-		if _, ok := filled[k]; !ok {
-			filled[k] = v
+		if _, ok := properties[k]; ok {
+			continue
 		}
+		if filled == nil {
+			filled = make(map[string]any, len(defaults))
+			maps.Copy(filled, properties)
+		}
+		filled[k] = v
+	}
+	if filled == nil {
+		return properties, false
 	}
 	return filled, true
 }

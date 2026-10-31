@@ -169,7 +169,18 @@ func (uc UserConfig) netherNetListenerFunc(conf Config) (Listener, error) {
 	}
 	var nat1to1 []string
 	if nn.PublicAddress != "" {
-		nat1to1 = []string{nn.PublicAddress}
+		addr := nn.PublicAddress
+		if net.ParseIP(addr) == nil {
+			if ips, err := net.LookupIP(addr); err == nil {
+				for _, ip := range ips {
+					if ip4 := ip.To4(); ip4 != nil {
+						addr = ip4.String()
+						break
+					}
+				}
+			}
+		}
+		nat1to1 = []string{addr}
 	}
 	return NetherNetConfig{Address: address, Key: key, Domain: nn.Domain, UDPPorts: r, NAT1To1IPs: nat1to1}.Listener(conf)
 }

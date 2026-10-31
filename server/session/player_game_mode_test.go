@@ -9,8 +9,8 @@ import (
 )
 
 func TestPocketMineSpectatorPresentation(t *testing.T) {
-	if got := gameTypeFromMode(world.GameModeSpectator); got != gameTypeSurvivalViewer {
-		t.Fatalf("spectator game type = %d, want survival viewer", got)
+	if got := gameTypeFromMode(world.GameModeSpectator); got != gameTypeCreativeViewer {
+		t.Fatalf("spectator game type = %d, want creative viewer", got)
 	}
 	abilities := gameModeAbilities(world.GameModeSpectator)
 	if abilities&protocol.AbilityInstantBuild == 0 || abilities&protocol.AbilityInvulnerable == 0 {

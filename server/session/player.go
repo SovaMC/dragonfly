@@ -1616,6 +1616,10 @@ func debugShapeToProtocol(shape debug.Shape, dim world.Dimension, attachedEntity
 	return ps
 }
 
+// gameTypeSurvivalViewer is the Bedrock SurvivalViewer game type, which
+// gophertunnel does not export a constant for.
+const gameTypeSurvivalViewer = 3
+
 // gameTypeFromMode returns the Bedrock game type ID from the game mode passed.
 // Upstream only distinguished creative vs survival, so adventure and spectator
 // were sent as survival and the client kept the survival HUD/collision.
@@ -1635,9 +1639,9 @@ func gameTypeFromMode(mode world.GameMode) int32 {
 	case 2:
 		return packet.GameTypeAdventure
 	case 3:
-		// spec: PocketMine-style spectator uses the creative game type so the
-		// hotbar still sends item-use packets. Noclip/fly come from abilities.
-		return packet.GameTypeCreative
+		// spec: PocketMine-style spectator uses the survival viewer game type.
+		// Noclip/fly come from abilities.
+		return gameTypeSurvivalViewer
 	case 4:
 		return packet.GameTypeSpectator
 	default:

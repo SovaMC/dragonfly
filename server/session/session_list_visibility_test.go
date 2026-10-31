@@ -8,8 +8,37 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+type playerListIdentityConn struct {
+	chunkVisibilityConn
+	identity login.IdentityData
+}
+
+func (c *playerListIdentityConn) IdentityData() login.IdentityData { return c.identity }
+
+func TestPlayerListUsesSubjectPlayFabIdentity(t *testing.T) {
+	subject := playerListTestSession(uuid.New())
+	viewer := playerListTestSession(uuid.New())
+	t.Cleanup(func() { _ = subject.ent.Close(); _ = viewer.ent.Close() })
+	subject.conn = &playerListIdentityConn{identity: login.IdentityData{PlayFabID: "subject-playfab"}}
+	viewer.conn = &playerListIdentityConn{identity: login.IdentityData{PlayFabID: "viewer-playfab"}}
+	list := new(sessionList)
+	list.sendSessionTo(subject, viewer)
+	packets := drainVisibilityPackets(viewer)
+	if len(packets) != 1 {
+		t.Fatalf("player-list packet count = %d", len(packets))
+	}
+	pk, ok := packets[0].(*packet.PlayerList)
+	if !ok || len(pk.Entries) != 1 {
+		t.Fatalf("player list = %#v", packets[0])
+	}
+	if entry := pk.Entries[0]; entry.UUID != subject.ent.UUID() || entry.PlayFabID != "subject-playfab" {
+		t.Fatalf("subject identity was not retained: %+v", entry)
+	}
+}
 
 func playerListTestSession(id uuid.UUID) *Session {
 	handle := world.EntitySpawnOpts{ID: id}.New(visibilityActorType{}, visibilityActorType{})

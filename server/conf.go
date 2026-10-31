@@ -227,6 +227,19 @@ func (conf Config) New() *Server {
 		}
 		conf.AcceptedProtocols = append(conf.AcceptedProtocols, protocols...)
 	}
+	// Native connections must use network hashes, independent of local palette
+	// ordering and custom blocks. An explicit native adapter takes precedence.
+	hasNative := false
+	for _, p := range conf.AcceptedProtocols {
+		hasNative = hasNative || p.ID() == minecraft.DefaultProtocol.ID()
+	}
+	if !hasNative {
+		p, err := NativeProtocol(conf.Blocks)
+		if err != nil {
+			panic(fmt.Sprintf("config: build native protocol: %v", err))
+		}
+		conf.AcceptedProtocols = append(conf.AcceptedProtocols, p)
+	}
 
 	if !conf.DisableResourceBuilding {
 		if pack, ok := packbuilder.BuildResourcePack(conf.Blocks); ok {
@@ -294,6 +307,7 @@ type UserConfig struct {
 		// programmatically through Config.Listeners.
 		Transport []string
 		// NetherNet holds settings for the NetherNet HTTP signaling listener.
+		// See NetherNetConfig for how clients find it and how to expose it.
 		NetherNet struct {
 			// Address is the TCP address used for NetherNet HTTP signaling. If
 			// empty, Network.Address is used. The listener serves plaintext HTTP;

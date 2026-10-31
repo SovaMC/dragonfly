@@ -615,7 +615,7 @@ func (p *Player) updateFallState(distanceThisTick float64) {
 
 // fall is called when a falling entity hits the ground.
 func (p *Player) fall(distance float64) {
-	if pos, lander, ok := p.landedOn(); ok {
+	if pos, lander, ok := p.landedOn(); ok && p.GameMode() != world.GameModeSpectator {
 		lander.EntityLand(pos, p.tx, p, &distance)
 	}
 	dmg := distance - 3
@@ -1002,7 +1002,7 @@ func (p *Player) kill(src world.DamageSource) {
 	p.StopSprinting()
 
 	pos := p.Position()
-	if !keepInv {
+	if !keepInv && p.GameMode() != world.GameModeSpectator {
 		p.dropItems()
 	}
 	for _, e := range p.Effects() {
@@ -1702,6 +1702,22 @@ func (p *Player) SetGameMode(mode world.GameMode) {
 			v.ViewEntityArmour(p)
 		}
 	}
+	if mode == world.GameModeSpectator {
+		p.session().CloseContainer(p.tx)
+		if pos, ok := p.Sleeping(); ok {
+			p.Wake()
+			if b, ok := p.tx.Block(pos).(block.Bed); ok {
+				if safe, ok := b.SafeSpawn(pos, p.tx); ok {
+					p.teleport(safe.Vec3Middle())
+				}
+			}
+		}
+		p.StopGliding()
+		if p.usingItem {
+			p.usingItem = false
+			p.updateState()
+		}
+	}
 
 	p.session().SendGameMode(p)
 	for _, v := range p.viewers() {
@@ -1762,6 +1778,9 @@ func (p *Player) SetCooldown(item world.Item, cooldown time.Duration) {
 // unless the held item implements the item.Usable interface, in which case it will be activated.
 // This generally happens for items such as throwable items like snowballs.
 func (p *Player) UseItem() {
+	if p.GameMode() == world.GameModeSpectator {
+		return
+	}
 	i, _ := p.HeldItems()
 	if p.usingItem {
 		if _, ok := i.Item().(item.Releasable); ok {
@@ -2483,6 +2502,9 @@ func (p *Player) obstructedPos(pos cube.Pos, b world.Block) (obstructed, selfOnl
 		case entity.ItemType, entity.ArrowType, entity.ExperienceOrbType:
 			continue
 		default:
+			if g, ok := e.(interface{ GameMode() world.GameMode }); ok && g.GameMode() == world.GameModeSpectator {
+				continue
+			}
 			if cube.AnyIntersections(blockBoxes, t.BBox(e).Translate(e.Position()).Grow(-1e-4)) {
 				obstructed = true
 				if e.H() == p.handle {
@@ -3409,6 +3431,9 @@ func (p *Player) checkBlockCollisions(vel mgl64.Vec3) {
 
 // checkEntityInsiders checks if the player is colliding with any EntityInsider blocks.
 func (p *Player) checkEntityInsiders(entityBBox cube.BBox) {
+	if p.GameMode() == world.GameModeSpectator {
+		return
+	}
 	box := entityBBox.Grow(-0.0001)
 	low, high := cube.PosFromVec3(box.Min()), cube.PosFromVec3(box.Max())
 
@@ -3436,7 +3461,7 @@ func (p *Player) checkEntityInsiders(entityBBox cube.BBox) {
 
 // checkEntitySteppers checks if the player is standing on any EntityStepper blocks.
 func (p *Player) checkEntitySteppers() {
-	if !p.OnGround() {
+	if !p.OnGround() || p.GameMode() == world.GameModeSpectator {
 		return
 	}
 	low, high := p.blocksUnder()

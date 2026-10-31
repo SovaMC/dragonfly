@@ -74,6 +74,13 @@ func (h *InventoryTransactionHandler) Handle(p packet.Packet, s *Session, tx *wo
 		h.resendInventories(s)
 		return
 	case *protocol.UseItemOnEntityTransactionData:
+		if data.Hand == protocol.HandSlotOffHand {
+			h.resendInventories(s)
+			return nil
+		}
+		if data.Hand != protocol.HandSlotMainHand {
+			return fmt.Errorf("invalid hand %d in entity interaction", data.Hand)
+		}
 		if err = s.verifyAndSetHeldSlotForInteraction(int(data.HotBarSlot), stackToItem(s.br, data.HeldItem.Stack), c); err != nil {
 			h.resyncHeldSlot(s, c, int(data.HotBarSlot))
 			if traced {
@@ -89,6 +96,13 @@ func (h *InventoryTransactionHandler) Handle(p packet.Packet, s *Session, tx *wo
 		}
 		return h.handleUseItemTransaction(data, s, tx, c)
 	case *protocol.ReleaseItemTransactionData:
+		if data.Hand == protocol.HandSlotOffHand {
+			h.resendInventories(s)
+			return nil
+		}
+		if data.Hand != protocol.HandSlotMainHand {
+			return fmt.Errorf("invalid hand %d in item release", data.Hand)
+		}
 		if err = s.verifyAndSetHeldSlotForInteraction(int(data.HotBarSlot), stackToItem(s.br, data.HeldItem.Stack), c); err != nil {
 			h.resyncHeldSlot(s, c, int(data.HotBarSlot))
 			return

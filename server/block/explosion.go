@@ -122,7 +122,7 @@ func (c ExplosionConfig) Explode(tx *world.Tx, src world.ExplosionSource) {
 	}
 
 	estimatedBlocks := max(32, min(4096, int(size*size*size*16)))
-	if liquid, ok := tx.Liquid(cube.PosFromVec3(explosionPos)); ok && !(c.IgnoreWaterResistance && isWaterLiquid(liquid)) {
+	if liquid, ok := tx.Liquid(cube.PosFromVec3(explosionPos)); ok && (!c.IgnoreWaterResistance || !isWaterLiquid(liquid)) {
 		// Liquids such as water stop a regular TNT blast at the source, so avoid reserving space for a full blast.
 		estimatedBlocks = 32
 	}

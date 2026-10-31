@@ -355,6 +355,15 @@ func (br *BasicBlockRegistry) Finalize() {
 		}
 		return fnv1.HashString64(nameOne) < fnv1.HashString64(nameTwo)
 	})
+	// Zero is ItemStack's no-block sentinel. Keep air at local zero; native
+	// connections use network hashes and historical adapters own target IDs.
+	for i, b := range br.blocks {
+		name, _ := b.EncodeBlock()
+		if name == "minecraft:air" {
+			br.blocks[0], br.blocks[i] = br.blocks[i], br.blocks[0]
+			break
+		}
+	}
 
 	br.blockInfos = make([]blockInfo, len(br.blocks))
 	br.hashes = intintmap.New(len(br.blocks), 0.999)
@@ -452,6 +461,19 @@ func (br *BasicBlockRegistry) StateToRuntimeID(name string, properties map[strin
 	}
 	rid, ok := br.stateRuntimeIDs[stateHash{name: name, properties: hashProperties(br.blockProperties[name])}]
 	return rid, ok
+}
+
+// DefaultProperties returns the properties of the default state of the block
+// with the name passed. The palette does not mark a default, so the first state
+// registered for the name is used. For vanilla blocks this matches the game's
+// default for every property a stored state can lack, as properties older than
+// the block state version are filled in by the upgrade schemas instead.
+func (br *BasicBlockRegistry) DefaultProperties(name string) (map[string]any, bool) {
+	if !br.finalized {
+		panic("BlockRegistry.DefaultProperties called on non finalized BlockRegistry")
+	}
+	properties, ok := br.blockProperties[name]
+	return properties, ok
 }
 
 // BlockHash returns a unique identifier of the block including the block states. This function is used internally

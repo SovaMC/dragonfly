@@ -12,7 +12,6 @@ import (
 func TestSkinProtocolRoundTripPreservesAppearanceMetadata(t *testing.T) {
 	s := skin.New(64, 64)
 	s.FullID = "full"
-	s.PlayFabID = "playfab"
 	s.Persona = true
 	s.Premium = true
 	s.PersonaCapeOnClassic = true
@@ -33,7 +32,7 @@ func TestSkinProtocolRoundTripPreservesAppearanceMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decoded.FullID != s.FullID || decoded.PlayFabID != s.PlayFabID || decoded.CapeID != s.CapeID || decoded.ProfileHash != s.ProfileHash {
+	if decoded.FullID != s.FullID || decoded.CapeID != s.CapeID || decoded.ProfileHash != s.ProfileHash {
 		t.Fatalf("decoded identifiers = %+v", decoded)
 	}
 	if len(decoded.PersonaPieces) != 1 || decoded.PersonaPieces[0] != s.PersonaPieces[0] {

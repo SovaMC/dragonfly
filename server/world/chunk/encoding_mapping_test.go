@@ -165,3 +165,7 @@ func (mappingTestBlockRegistry) RuntimeIDToState(runtimeID uint32) (string, map[
 func (mappingTestBlockRegistry) StateToRuntimeID(string, map[string]any) (uint32, bool) {
 	return 0, false
 }
+
+func (mappingTestBlockRegistry) DefaultProperties(string) (map[string]any, bool) {
+	return nil, false
+}

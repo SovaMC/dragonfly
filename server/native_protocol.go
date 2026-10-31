@@ -40,6 +40,11 @@ type nativeProtocol struct {
 func (p *nativeProtocol) MapBlockRuntimeID(id uint32) (uint32, bool) {
 	return p.registry.RuntimeIDToHash(id)
 }
+
+// UnmapBlockRuntimeID maps a network hash written by MapBlockRuntimeID back to a runtime ID.
+func (p *nativeProtocol) UnmapBlockRuntimeID(id uint32) (uint32, bool) {
+	return p.registry.HashToRuntimeID(id)
+}
 func (*nativeProtocol) MapBiomeRuntimeID(id uint32) (uint32, bool) { return id, true }
 func (p *nativeProtocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
 	return p.convert(pk, false)

@@ -1778,7 +1778,9 @@ func (p *Player) SetCooldown(item world.Item, cooldown time.Duration) {
 // unless the held item implements the item.Usable interface, in which case it will be activated.
 // This generally happens for items such as throwable items like snowballs.
 func (p *Player) UseItem() {
-	if p.GameMode() == world.GameModeSpectator {
+	if p.GameMode() == world.GameModeNativeSpectator {
+		// PocketMine-style spectators still reach HandleItemUse below so servers
+		// can handle hotbar items; vanilla use is stopped by the collision check.
 		return
 	}
 	i, _ := p.HeldItems()

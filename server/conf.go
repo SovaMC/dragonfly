@@ -326,6 +326,10 @@ type UserConfig struct {
 			// connections use. A single port is shared by all connections. If
 			// empty, the operating system picks the ports.
 			UDPPorts string
+			// PublicAddress is the public IP or hostname advertised in ICE candidates
+			// when the server runs behind NAT or Docker port forwarding. If non-empty,
+			// this address replaces the private container IP in host candidates.
+			PublicAddress string
 		}
 	}
 	Server struct {

@@ -167,7 +167,11 @@ func (uc UserConfig) netherNetListenerFunc(conf Config) (Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse UDP port range: %w", err)
 	}
-	return NetherNetConfig{Address: address, Key: key, Domain: nn.Domain, UDPPorts: r}.Listener(conf)
+	var nat1to1 []string
+	if nn.PublicAddress != "" {
+		nat1to1 = []string{nn.PublicAddress}
+	}
+	return NetherNetConfig{Address: address, Key: key, Domain: nn.Domain, UDPPorts: r, NAT1To1IPs: nat1to1}.Listener(conf)
 }
 
 // ListenNetwork returns a Listener accepting connections for conf over any
@@ -218,6 +222,9 @@ type NetherNetConfig struct {
 	// UDPPorts is the UDP port range used for player connections. See PortRange
 	// for how single ports and zero bounds behave.
 	UDPPorts PortRange
+	// NAT1To1IPs sets external IP addresses for 1:1 NAT mapping (e.g. Docker port forwarding
+	// or cloud Elastic IPs) to replace internal container IPs in host candidates.
+	NAT1To1IPs []string
 }
 
 // parsePortRange parses "port" or "min-max" as a PortRange. An empty string
@@ -297,6 +304,9 @@ func (nc NetherNetConfig) Listener(conf Config) (Listener, error) {
 
 	var deferred closeFuncs
 	settingEngine := webrtc.SettingEngine{}
+	if len(nc.NAT1To1IPs) > 0 {
+		settingEngine.SetNAT1To1IPs(nc.NAT1To1IPs, webrtc.ICECandidateTypeHost)
+	}
 	if ports := nc.UDPPorts; ports.Min != 0 && ports.Min == ports.Max {
 		mux, err := ice.NewMultiUDPMuxFromPort(int(ports.Min))
 		if err != nil {

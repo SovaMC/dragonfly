@@ -37,6 +37,11 @@ func (e *Ent) H() *world.EntityHandle {
 	return e.handle
 }
 
+// Tx returns the transaction the entity was opened in.
+func (e *Ent) Tx() *world.Tx {
+	return e.tx
+}
+
 func (e *Ent) Behaviour() Behaviour {
 	b, _ := e.data.Data.(Behaviour)
 	return b

@@ -17,8 +17,9 @@ import (
 type Stack struct {
 	id int32
 
-	item  world.Item
-	count int
+	item     world.Item
+	count    int
+	maxCount int
 
 	customName string
 	lore       []string
@@ -54,6 +55,9 @@ func (s Stack) Count() int {
 // MaxCount returns the maximum count that the stack is able to hold when added to an inventory or when added
 // to an item entity.
 func (s Stack) MaxCount() int {
+	if s.maxCount > 0 {
+		return s.maxCount
+	}
 	if counter, ok := s.item.(MaxCounter); ok {
 		return counter.MaxCount()
 	}
@@ -148,6 +152,13 @@ func (s Stack) WithDurability(d int) Stack {
 // Unbreakable checks if the item stack is unbreakable.
 func (s Stack) Unbreakable() bool {
 	return s.unbreakable
+}
+
+// WithMaxCount returns a copy of the stack that may hold up to n items, overriding the maximum count of the item
+// type. Passing 0 restores the default maximum count of the item.
+func (s Stack) WithMaxCount(n int) Stack {
+	s.maxCount = max(n, 0)
+	return s
 }
 
 // AsUnbreakable returns a copy of the Stack with the unbreakable tag set. If the item does not implement the

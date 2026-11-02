@@ -11,6 +11,7 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/google/uuid"
 	"github.com/pelletier/go-toml"
+	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -47,6 +48,7 @@ type swimmingConfigConn struct{ session.Conn }
 func (swimmingConfigConn) IdentityData() login.IdentityData { return login.IdentityData{} }
 func (swimmingConfigConn) ClientData() login.ClientData     { return login.ClientData{} }
 func (swimmingConfigConn) RemoteAddr() net.Addr             { return &net.UDPAddr{} }
+func (swimmingConfigConn) Proto() minecraft.Protocol        { return nil }
 func (swimmingConfigConn) ChunkRadius() int                 { return 1 }
 func (swimmingConfigConn) WritePacket(packet.Packet) error  { return nil }
 func (swimmingConfigConn) Close() error                     { return nil }

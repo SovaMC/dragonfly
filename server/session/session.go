@@ -176,6 +176,8 @@ type Conn interface {
 	WritePacket(pk packet.Packet) error
 	// StartGameContext starts the game for the Conn with a context to cancel it.
 	StartGameContext(ctx context.Context, data minecraft.GameData) error
+	// Proto returns the protocol of the client at the other end of the Conn. Chunks are encoded for this protocol.
+	Proto() minecraft.Protocol
 }
 
 // Nop represents a no-operation session. It does not do anything when sending a packet to it.
@@ -212,10 +214,7 @@ type Config struct {
 }
 
 func (conf Config) New(conn Conn) *Session {
-	var networkProtocol minecraft.Protocol
-	if provider, ok := conn.(interface{ Proto() minecraft.Protocol }); ok {
-		networkProtocol = provider.Proto()
-	}
+	networkProtocol := conn.Proto()
 	maxChunkRadius := maxChunkRadiusForProtocol(conf.MaxChunkRadius, networkProtocol)
 	requestedChunkRadius := conn.ChunkRadius()
 	r := requestedChunkRadius
@@ -253,7 +252,7 @@ func (conf Config) New(conn Conn) *Session {
 		requestedChunkRadius:   int32(requestedChunkRadius),
 		maxChunkRadius:         int32(maxChunkRadius),
 		networkMaxChunkRadius:  int32(maxChunkRadius),
-		subChunkRequests:       !conf.DisableSubChunkRequests,
+		subChunkRequests:       !conf.DisableSubChunkRequests && supportsSubChunkRequests(networkProtocol),
 		emoteChatMuted:         conf.EmoteChatMuted,
 		conn:                   conn,
 		currentEntityRuntimeID: 1,
@@ -315,6 +314,15 @@ func (conf Config) New(conn Conn) *Session {
 		}
 	}()
 	return s
+}
+
+// firstSubChunkRequestProtocol is the protocol of 1.17.40, the first version with client-driven sub-chunk requests.
+const firstSubChunkRequestProtocol = 471
+
+// supportsSubChunkRequests returns false for clients that only load complete chunks. Such a client ends up in an empty
+// world if it is told to request the sub-chunks itself.
+func supportsSubChunkRequests(networkProtocol minecraft.Protocol) bool {
+	return networkProtocol == nil || networkProtocol.ID() >= firstSubChunkRequestProtocol
 }
 
 func maxChunkRadiusForProtocol(configured int, networkProtocol minecraft.Protocol) int {

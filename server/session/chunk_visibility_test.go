@@ -21,6 +21,7 @@ func (*chunkVisibilityConn) Close() error                                       
 func (*chunkVisibilityConn) IdentityData() login.IdentityData                           { return login.IdentityData{} }
 func (*chunkVisibilityConn) ClientData() login.ClientData                               { return login.ClientData{} }
 func (c *chunkVisibilityConn) ClientCacheEnabled() bool                                 { return c.cache }
+func (*chunkVisibilityConn) Proto() minecraft.Protocol                                  { return nil }
 func (*chunkVisibilityConn) ChunkRadius() int                                           { return 1 }
 func (*chunkVisibilityConn) Latency() time.Duration                                     { return 0 }
 func (*chunkVisibilityConn) Flush() error                                               { return nil }

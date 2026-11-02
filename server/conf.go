@@ -540,6 +540,7 @@ func DefaultConfig() UserConfig {
 	c.Server.AuthEnabled = true
 	c.World.SaveData = true
 	c.World.Folder = "world"
+	c.World.DisableSubChunkRequests = true
 	c.Players.MaximumChunkRadius = 32
 	c.Players.SaveData = true
 	c.Players.Folder = "players"

@@ -67,6 +67,10 @@ type ProjectileBehaviourConfig struct {
 	// Collides may be set to filter the entities the projectile can collide
 	// with. If it returns false for an entity, the projectile passes through it.
 	Collides func(e *Ent, tx *world.Tx, other world.Entity) bool
+	// IgnoreBlock may be set to let the projectile pass through blocks. It is
+	// called for every block position the projectile moves through and returns
+	// true if the projectile should not collide with the block.
+	IgnoreBlock func(e *Ent, tx *world.Tx, pos cube.Pos, b world.Block) bool
 	// SurviveBlockCollision specifies if a projectile with this
 	// ProjectileBehaviour should survive collision with a block. If set to
 	// false, the projectile will break when hitting a block (like a snowball).
@@ -352,7 +356,11 @@ func (lt *ProjectileBehaviour) tickMovement(e *Ent, tx *world.Tx) (*Movement, tr
 		ok  bool
 	)
 	if !mgl64.FloatEqual(end.Sub(pos).LenSqr(), 0) {
-		if hit, ok = trace.Perform(pos, end, tx, e.H().Type().BBox(e).Grow(1.0), lt.ignores(e)); ok {
+		var ignoreBlock func(pos cube.Pos, b world.Block) bool
+		if lt.conf.IgnoreBlock != nil {
+			ignoreBlock = func(pos cube.Pos, b world.Block) bool { return lt.conf.IgnoreBlock(e, tx, pos, b) }
+		}
+		if hit, ok = trace.PerformIgnoring(pos, end, tx, e.H().Type().BBox(e).Grow(1.0), lt.ignores(e), ignoreBlock); ok {
 			if _, ok := hit.(trace.BlockResult); ok {
 				// Undo the gravity because the velocity as a result of gravity
 				// at the point of collision should be 0.

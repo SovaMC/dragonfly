@@ -24,9 +24,19 @@ type EntityFilter func(iter.Seq[world.Entity]) iter.Seq[world.Entity]
 // ray. The physics.BBox that's passed is used for checking if any entity within the bounding box collided
 // with the ray.
 func Perform(start, end mgl64.Vec3, tx *world.Tx, box cube.BBox, filter EntityFilter) (hit Result, ok bool) {
+	return PerformIgnoring(start, end, tx, box, filter, nil)
+}
+
+// PerformIgnoring performs a ray trace like Perform, except that blocks for which ignore returns true are not
+// collided with. It is called for every block position the ray passes through, even if the ray does not intersect
+// the model of the block. If ignore is nil, no blocks are ignored.
+func PerformIgnoring(start, end mgl64.Vec3, tx *world.Tx, box cube.BBox, filter EntityFilter, ignore func(pos cube.Pos, b world.Block) bool) (hit Result, ok bool) {
 	// Check if there's any blocks that we may collide with.
 	TraverseBlocks(start, end, func(pos cube.Pos) (cont bool) {
 		b := tx.Block(pos)
+		if ignore != nil && ignore(pos, b) {
+			return true
+		}
 
 		// Check if we collide with the block's model.
 		if result, ok := BlockIntercept(pos, tx, b, start, end); ok {

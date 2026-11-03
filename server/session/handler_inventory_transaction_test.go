@@ -7,6 +7,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/item/inventory"
+	"github.com/df-mc/dragonfly/server/player/form"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -180,6 +181,56 @@ func TestBlockUseRepeatsOnlyForItemsWithBlockUse(t *testing.T) {
 	} {
 		if got := repeatsOnBlock(test.stack); got != test.want {
 			t.Fatalf("%s: repeatsOnBlock() = %v, want %v", test.name, got, test.want)
+		}
+	}
+}
+
+// TestPlainItemUseWaitsForForms keeps a held menu item from queueing forms or
+// reopening one as it closes, while other items and later presses still work.
+func TestPlainItemUseWaitsForForms(t *testing.T) {
+	forms := &ModalFormResponseHandler{forms: map[uint32]form.Form{}, sent: map[uint32]time.Time{}}
+	s := &Session{handlers: map[uint32]packetHandler{packet.IDModalFormResponse: forms}}
+	h := &InventoryTransactionHandler{}
+	now := time.Now()
+
+	if h.holdPlainUse(s, now) {
+		t.Fatal("first use held back without a form")
+	}
+	forms.forms[1], forms.sent[1] = &modalResponseTestForm{}, now
+	if !h.holdPlainUse(s, now.Add(200*time.Millisecond)) {
+		t.Fatal("use while a form awaits its answer was not held back")
+	}
+	if err := forms.Handle(&packet.ModalFormResponse{FormID: 1}, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	answered := forms.answered
+	if !h.holdPlainUse(s, answered.Add(100*time.Millisecond)) {
+		t.Fatal("re-press as the form closed was not held back")
+	}
+	if !h.holdPlainUse(s, answered.Add(500*time.Millisecond)) {
+		t.Fatal("continued re-press did not extend the quiet period")
+	}
+	if h.holdPlainUse(s, answered.Add(1100*time.Millisecond)) {
+		t.Fatal("a later press stayed held back")
+	}
+	forms.forms[2], forms.sent[2] = &modalResponseTestForm{}, answered.Add(-formAwaitLimit)
+	if h.holdPlainUse(s, answered.Add(2*time.Second)) {
+		t.Fatal("an unanswered form older than the limit still held back use")
+	}
+
+	for _, test := range []struct {
+		name  string
+		stack item.Stack
+		want  bool
+	}{
+		{"menu", item.NewStack(item.Stick{}, 1), true},
+		{"block", item.NewStack(block.Stone{}, 1), false},
+		{"snowball", item.NewStack(item.Snowball{}, 1), false},
+		{"food", item.NewStack(item.Apple{}, 1), false},
+		{"empty", item.Stack{}, false},
+	} {
+		if got := plainUse(test.stack); got != test.want {
+			t.Fatalf("%s: plainUse() = %v, want %v", test.name, got, test.want)
 		}
 	}
 }

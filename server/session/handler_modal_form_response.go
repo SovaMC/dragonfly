@@ -7,6 +7,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // ModalFormResponseHandler handles the ModalFormResponse packet.
@@ -14,6 +15,11 @@ type ModalFormResponseHandler struct {
 	mu        sync.Mutex
 	forms     map[uint32]form.Form
 	currentID atomic.Uint32
+	// sent holds when each form still awaiting a response was sent, and
+	// answered when the last response arrived. Item use reads both so a held
+	// click cannot queue more forms or reopen one as it closes.
+	sent     map[uint32]time.Time
+	answered time.Time
 }
 
 // Handle ...
@@ -23,6 +29,8 @@ func (h *ModalFormResponseHandler) Handle(p packet.Packet, _ *Session, tx *world
 	h.mu.Lock()
 	f, ok := h.forms[pk.FormID]
 	delete(h.forms, pk.FormID)
+	delete(h.sent, pk.FormID)
+	h.answered = time.Now()
 	h.mu.Unlock()
 
 	resp, exists := pk.ResponseData.Value()
@@ -40,4 +48,18 @@ func (h *ModalFormResponseHandler) Handle(p packet.Packet, _ *Session, tx *world
 		return fmt.Errorf("error submitting form data: %w", err)
 	}
 	return nil
+}
+
+// formState reports whether a form sent less than awaitLimit before now is
+// still unanswered, and when the last response arrived. The limit keeps a
+// response the client never sends from blocking item use indefinitely.
+func (h *ModalFormResponseHandler) formState(now time.Time, awaitLimit time.Duration) (awaiting bool, answered time.Time) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, sent := range h.sent {
+		if now.Sub(sent) < awaitLimit {
+			return true, h.answered
+		}
+	}
+	return false, h.answered
 }

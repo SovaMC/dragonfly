@@ -533,10 +533,15 @@ func (s *Session) SendForm(f form.Form) {
 		s.conf.Log.Debug("SendForm: more than 10 active forms: dropping an existing one")
 		for k := range h.forms {
 			delete(h.forms, k)
+			delete(h.sent, k)
 			break
 		}
 	}
 	h.forms[id] = f
+	if h.sent == nil {
+		h.sent = make(map[uint32]time.Time)
+	}
+	h.sent[id] = time.Now()
 	h.mu.Unlock()
 
 	s.writePacket(&packet.ModalFormRequest{
@@ -548,6 +553,12 @@ func (s *Session) SendForm(f form.Form) {
 // CloseForm closes any forms that the player currently has open. If the player has no forms open, nothing
 // happens.
 func (s *Session) CloseForm() {
+	h := s.handlers[packet.IDModalFormResponse].(*ModalFormResponseHandler)
+	h.mu.Lock()
+	// The client may not answer forms the server closed, so they no longer
+	// hold back item use. A late answer still reaches the form.
+	clear(h.sent)
+	h.mu.Unlock()
 	s.writePacket(&packet.ClientBoundCloseForm{})
 }
 
@@ -1533,9 +1544,8 @@ func gameTypeFromMode(mode world.GameMode) int32 {
 	case 3:
 		// spec: PocketMine-style spectator keeps a non-spectator game type so the
 		// hotbar still sends item-use packets. Noclip/fly come from abilities.
-		// PocketMine sends creative, but 1.26.60 creative clients stopped sending
-		// air use for custom items without a use component, while adventure
-		// clients still send it like survival.
+		// PocketMine sends creative; adventure keeps the item-use path of the
+		// survival-type lobby, whose menu items work in air on current clients.
 		return packet.GameTypeAdventure
 	case 4:
 		return packet.GameTypeSpectator

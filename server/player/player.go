@@ -3495,8 +3495,9 @@ func (p *Player) checkOnGround() bool {
 	// Search near the feet, including blocks whose models extend outside their
 	// own cell (such as 1.5-block-tall fences). A body or swept-path intersection
 	// says nothing about support: walls, ceilings and departed ledges must not
-	// end a fall. Allow only the small error from client float32 coordinates.
-	const tolerance = 0.001
+	// end a fall. Clients stay about 0.001 above a block after a teleport until they next move vertically, so allow
+	// for that on top of the small error from client float32 coordinates.
+	const tolerance = 0.002
 	b := cube.Box(min[0], min[1], min[2], max[0], min[1], max[2]).Grow(1)
 
 	epsilon := mgl64.Vec3{mgl64.Epsilon, mgl64.Epsilon, mgl64.Epsilon}

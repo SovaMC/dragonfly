@@ -45,7 +45,7 @@ func (d CopperDoor) Strip() (world.Block, world.Sound, bool) {
 
 // Model ...
 func (d CopperDoor) Model() world.BlockModel {
-	return model.Door{Facing: d.Facing, Open: d.Open, Right: d.Right}
+	return model.Door{Facing: d.Facing, Open: d.Open, Right: d.Right, Top: d.Top}
 }
 
 // Wax waxes the copper door to stop it from oxidising further.

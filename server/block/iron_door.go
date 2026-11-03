@@ -27,7 +27,7 @@ type IronDoor struct {
 
 // Model ...
 func (d IronDoor) Model() world.BlockModel {
-	return model.Door{Facing: d.Facing, Open: d.Open, Right: d.Right}
+	return model.Door{Facing: d.Facing, Open: d.Open, Right: d.Right, Top: d.Top}
 }
 
 // NeighbourUpdateTick ...

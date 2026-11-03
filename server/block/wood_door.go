@@ -48,7 +48,7 @@ func (d WoodDoor) FuelInfo() item.FuelInfo {
 
 // Model ...
 func (d WoodDoor) Model() world.BlockModel {
-	return model.Door{Facing: d.Facing, Open: d.Open, Right: d.Right}
+	return model.Door{Facing: d.Facing, Open: d.Open, Right: d.Right, Top: d.Top}
 }
 
 // NeighbourUpdateTick ...

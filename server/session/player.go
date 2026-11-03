@@ -7,7 +7,9 @@ import (
 	"maps"
 	"math"
 	"net"
+	"reflect"
 	"slices"
+	"sync"
 	"time"
 	_ "unsafe" // Imported for compiler directives.
 
@@ -263,6 +265,36 @@ func (s *Session) sendBiomes() {
 
 // sendRecipes sends the current crafting recipes to the session.
 func (s *Session) sendRecipes() {
+	catalogue := recipeCatalogueOf(s.br)
+	s.recipes = catalogue.byNetworkID
+	s.writePacket(catalogue.packet)
+}
+
+// recipeCatalogue holds the recipes and the packet listing them. Both are the same for every session with the same
+// block registry and are never modified, so these sessions share one catalogue instead of each holding a copy.
+type recipeCatalogue struct {
+	count       int
+	byNetworkID map[uint32]recipe.Recipe
+	packet      *packet.CraftingData
+}
+
+var recipeCatalogues sync.Map
+
+// recipeCatalogueOf returns the catalogue of br, building it again if recipes were registered since it was built.
+func recipeCatalogueOf(br world.BlockRegistry) *recipeCatalogue {
+	recipes := recipe.Recipes()
+	if !reflect.TypeOf(br).Comparable() {
+		return newRecipeCatalogue(br, recipes)
+	}
+	if cached, ok := recipeCatalogues.Load(br); ok && cached.(*recipeCatalogue).count == len(recipes) {
+		return cached.(*recipeCatalogue)
+	}
+	catalogue := newRecipeCatalogue(br, recipes)
+	recipeCatalogues.Store(br, catalogue)
+	return catalogue
+}
+
+func newRecipeCatalogue(br world.BlockRegistry, recipes []recipe.Recipe) *recipeCatalogue {
 	var (
 		shapedRecipes            []protocol.ShapedRecipe
 		shapelessRecipes         []protocol.ShapelessRecipe
@@ -274,17 +306,18 @@ func (s *Session) sendRecipes() {
 		potionContainerChange    []protocol.PotionContainerChangeRecipe
 	)
 
-	for index, i := range recipe.Recipes() {
+	byNetworkID := make(map[uint32]recipe.Recipe, len(recipes))
+	for index, i := range recipes {
 		networkID := uint32(index) + 1
-		s.recipes[networkID] = i
+		byNetworkID[networkID] = i
 
 		switch i := i.(type) {
 		case recipe.Shapeless:
 			shapelessRecipes = append(shapelessRecipes, protocol.ShapelessRecipe{
 				RecipeID:        uuid.New().String(),
 				Priority:        int32(i.Priority()),
-				Input:           stacksToIngredientItems(s.br, i.Input()),
-				Output:          stacksToRecipeStacks(s.br, i.Output()),
+				Input:           stacksToIngredientItems(br, i.Input()),
+				Output:          stacksToRecipeStacks(br, i.Output()),
 				Block:           i.Block(),
 				RecipeNetworkID: networkID,
 			})
@@ -292,8 +325,8 @@ func (s *Session) sendRecipes() {
 			userDataShapelessRecipes = append(userDataShapelessRecipes, protocol.UserDataShapelessRecipe{ShapelessRecipe: protocol.ShapelessRecipe{
 				RecipeID:        uuid.New().String(),
 				Priority:        int32(i.Priority()),
-				Input:           stacksToIngredientItems(s.br, i.Input()),
-				Output:          stacksToRecipeStacks(s.br, i.Output()),
+				Input:           stacksToIngredientItems(br, i.Input()),
+				Output:          stacksToRecipeStacks(br, i.Output()),
 				Block:           i.Block(),
 				RecipeNetworkID: networkID,
 			}})
@@ -308,14 +341,14 @@ func (s *Session) sendRecipes() {
 				Priority:        int32(i.Priority()),
 				Width:           int32(i.Shape().Width()),
 				Height:          int32(i.Shape().Height()),
-				Input:           stacksToIngredientItems(s.br, i.Input()),
-				Output:          stacksToRecipeStacks(s.br, i.Output()),
+				Input:           stacksToIngredientItems(br, i.Input()),
+				Output:          stacksToRecipeStacks(br, i.Output()),
 				Block:           i.Block(),
 				AssumeSymmetry:  true,
 				RecipeNetworkID: networkID,
 			})
 		case recipe.SmithingTransform:
-			input, output := stacksToIngredientItems(s.br, i.Input()), stacksToRecipeStacks(s.br, i.Output())
+			input, output := stacksToIngredientItems(br, i.Input()), stacksToRecipeStacks(br, i.Output())
 			smithingTransformRecipes = append(smithingTransformRecipes, protocol.SmithingTransformRecipe{
 				RecipeID:        uuid.New().String(),
 				Base:            input[0],
@@ -326,7 +359,7 @@ func (s *Session) sendRecipes() {
 				RecipeNetworkID: networkID,
 			})
 		case recipe.SmithingTrim:
-			input := stacksToIngredientItems(s.br, i.Input())
+			input := stacksToIngredientItems(br, i.Input())
 			smithingTrimRecipes = append(smithingTrimRecipes, protocol.SmithingTrimRecipe{
 				RecipeID:        uuid.New().String(),
 				Base:            input[0],
@@ -361,7 +394,7 @@ func (s *Session) sendRecipes() {
 			})
 		}
 	}
-	s.writePacket(&packet.CraftingData{
+	return &recipeCatalogue{count: len(recipes), byNetworkID: byNetworkID, packet: &packet.CraftingData{
 		ShapedRecipes:                shapedRecipes,
 		ShapelessRecipes:             shapelessRecipes,
 		MultiRecipes:                 multiRecipes,
@@ -371,7 +404,7 @@ func (s *Session) sendRecipes() {
 		PotionRecipes:                potionRecipes,
 		PotionContainerChangeRecipes: potionContainerChange,
 		ClearRecipes:                 true,
-	})
+	}}
 }
 
 // sendArmourTrimData sends the armour trim data.

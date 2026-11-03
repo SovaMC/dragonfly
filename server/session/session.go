@@ -109,6 +109,9 @@ type Session struct {
 
 	recipes map[uint32]recipe.Recipe
 
+	// chunksSettled is true if the last session tick had no chunks or players left to send.
+	chunksSettled atomic.Bool
+
 	blobMu                sync.Mutex
 	blobs                 map[uint64][]byte
 	openChunkTransactions []map[uint64]struct{}
@@ -556,8 +559,13 @@ func (s *Session) background() {
 	for {
 		select {
 		case <-t.C:
+			// A transaction on every tick is only needed while there is something to send. Once all chunks around
+			// the player are loaded, half the rate still picks up a player moving into a new chunk unnoticed.
+			if i++; i%2 == 1 && s.chunksSettled.Load() {
+				continue
+			}
 			if err := s.withControllable(context.Background(), func(tx *world.Tx, c Controllable) error {
-				if i++; i%20 == 0 {
+				if i%20 == 0 {
 					// Enum resending happens relatively often and frequent updates are more important than with full
 					// command changes. Those are generally only related to permission changes, which doesn't happen often.
 					r = s.resendEnums(enums, enumValues, softEnums, r, c)
@@ -613,6 +621,11 @@ func (s *Session) sendChunks(tx *world.Tx, c Controllable) {
 	}
 	s.chunkLoader.Load(tx, toLoad)
 	s.flushPendingPlayers(tx)
+
+	s.entityMutex.RLock()
+	pendingPlayers := len(s.pendingPlayers)
+	s.entityMutex.RUnlock()
+	s.chunksSettled.Store(pendingPlayers == 0 && s.chunkLoader.Pending() == 0)
 }
 
 // SetChunkLoadingPaused suspends automatic chunk loading while an application

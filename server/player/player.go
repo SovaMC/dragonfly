@@ -3394,8 +3394,9 @@ func (p *Player) checkBlockCollisions(vel mgl64.Vec3) {
 	minX, minY, minZ := int(math.Floor(low[0])), int(math.Floor(low[1])), int(math.Floor(low[2]))
 	maxX, maxY, maxZ := int(math.Ceil(high[0])), int(math.Ceil(high[1])), int(math.Ceil(high[2]))
 
-	// A prediction of one BBox per block, plus an additional 2, in case
-	blocks := make([]cube.BBox, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ)+2)
+	// Enough for the blocks around a walking player, so that this does not allocate on every movement.
+	var nearby [48]cube.BBox
+	blocks := nearby[:0]
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {

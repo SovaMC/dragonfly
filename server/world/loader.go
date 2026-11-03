@@ -91,6 +91,17 @@ func (l *Loader) Move(tx *Tx, pos mgl64.Vec3) {
 // the background. The Viewer's ViewChunk is called for each chunk once ready, which may be after Load
 // returns. Load does nothing for n <= 0.
 func (l *Loader) Load(tx *Tx, n int) {
+	l.load(tx, n)
+}
+
+// Pending returns the number of chunks the Loader still has to load.
+func (l *Loader) Pending() int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return len(l.loadQueue)
+}
+
+func (l *Loader) load(tx *Tx, n int) {
 	for i := 0; i < n; i++ {
 		l.mu.Lock()
 		if l.closed || l.w == nil {

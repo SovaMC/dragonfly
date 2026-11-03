@@ -12,9 +12,12 @@ type Solid struct{}
 // full is a BBox that occupies a full block.
 var full = cube.Box(0, 0, 0, 1, 1, 1)
 
+// fullBoxes is the shared result of Solid.BBox. Its capacity is limited so that appending to it makes a copy.
+var fullBoxes = []cube.BBox{full}[:1:1]
+
 // BBox returns a physics.BBox spanning a full block.
 func (Solid) BBox(cube.Pos, world.BlockSource) []cube.BBox {
-	return []cube.BBox{full}
+	return fullBoxes
 }
 
 // FaceSolid always returns true.

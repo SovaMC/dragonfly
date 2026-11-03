@@ -160,11 +160,16 @@ func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 	}
 
 	for pos, c := range tx.World().chunks {
+		if !randomTicking && len(c.BlockEntities) == 0 {
+			continue
+		}
 		if !t.anyWithinDistance(pos, loaded, r) {
 			// No loaders in this chunk that are within the simulation distance, so proceed to the next.
 			continue
 		}
-		blockEntities = append(blockEntities, slices.Collect(maps.Keys(c.BlockEntities))...)
+		for blockPos := range c.BlockEntities {
+			blockEntities = append(blockEntities, blockPos)
+		}
 		if !randomTicking {
 			continue
 		}

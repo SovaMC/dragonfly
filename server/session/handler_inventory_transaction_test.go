@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/item/inventory"
 	"github.com/go-gl/mathgl/mgl32"
@@ -159,5 +160,26 @@ func TestInteractionPredictionCompatibility(t *testing.T) {
 				t.Fatalf("interactionPredictionCompatible() = %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+// TestBlockUseRepeatsOnlyForItemsWithBlockUse keeps held right-click repeats on
+// a block from re-running handlers of items with no block use, such as menu
+// items, while block placement and buckets keep repeating.
+func TestBlockUseRepeatsOnlyForItemsWithBlockUse(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		stack item.Stack
+		want  bool
+	}{
+		{"block", item.NewStack(block.Stone{}, 1), true},
+		{"bucket", item.NewStack(item.Bucket{}, 1), true},
+		{"bow", item.NewStack(item.Bow{}, 1), true},
+		{"stick", item.NewStack(item.Stick{}, 1), false},
+		{"sword", item.NewStack(item.Sword{Tier: item.ToolTierDiamond}, 1), false},
+	} {
+		if got := repeatsOnBlock(test.stack); got != test.want {
+			t.Fatalf("%s: repeatsOnBlock() = %v, want %v", test.name, got, test.want)
+		}
 	}
 }

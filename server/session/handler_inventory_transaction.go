@@ -403,12 +403,29 @@ func skipSimulationTick(action, trigger uint32, c Controllable, tx *world.Tx, po
 	if _, ok := held.Item().(item.FishingRod); ok {
 		return true
 	}
+	if !held.Empty() && !repeatsOnBlock(held) {
+		// An item with no block use, such as a menu item, would otherwise run
+		// its handler again for every repeat while the button is held.
+		return true
+	}
 	if tx != nil {
 		if _, ok := tx.Block(pos).(block.IronDoor); ok {
 			return true
 		}
 	}
 	return false
+}
+
+// repeatsOnBlock reports whether held keeps a vanilla effect when its block use
+// repeats: placing blocks, item block uses such as buckets, usable items and
+// items that charge while held.
+func repeatsOnBlock(held item.Stack) bool {
+	switch held.Item().(type) {
+	case world.Block, item.UsableOnBlock, item.Usable, item.Releasable, item.Chargeable:
+		return true
+	default:
+		return false
+	}
 }
 
 func skipAirSimulationTick(held item.Stack, using bool) bool {

@@ -2304,6 +2304,15 @@ func (p *Player) AttackEntity(e world.Entity) bool {
 	return true
 }
 
+// handleTick calls the optional tick hook of players without a session and
+// reports whether the handler replaced the default movement.
+func handleTick(h Handler, ctx *Context, current int64) bool {
+	if h, ok := h.(TickHandler); ok {
+		h.HandleTick(ctx, current)
+	}
+	return ctx.Cancelled()
+}
+
 // handleAttackKnockBack calls the optional successful-attack knockback hook
 // and reports whether the handler replaced the default motion.
 func handleAttackKnockBack(h Handler, ctx *Context, e world.Entity, force, height float64) bool {
@@ -3170,7 +3179,7 @@ func (p *Player) Tick(tx *world.Tx, current int64) {
 	}
 	p.prevWorld = tx.World()
 
-	if p.session() == session.Nop && !p.Immobile() {
+	if p.session() == session.Nop && !handleTick(p.Handler(), NewEventContext(tx, p), current) && !p.Immobile() {
 		m := p.mc.TickMovement(p, p.Position(), p.Velocity(), p.Rotation(), p.tx)
 		m.Send()
 

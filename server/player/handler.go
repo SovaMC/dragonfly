@@ -167,6 +167,15 @@ type KnockBackHandler interface {
 	HandleKnockBack(ctx *Context, src mgl64.Vec3, force, height float64)
 }
 
+// TickHandler may be implemented by the Handler of a player without a session
+// to control the player every tick. HandleTick is called at the end of each
+// tick of the player. Calling ctx.Cancel() skips the default movement that
+// is otherwise computed for players without a session, so that the handler
+// can move the player itself.
+type TickHandler interface {
+	HandleTick(ctx *Context, current int64)
+}
+
 // AttackKnockBackHandler may be implemented by a Handler to replace the
 // knockback applied after a successful entity attack. HandleAttackKnockBack is
 // called after damage was accepted and before feedback for the attack is

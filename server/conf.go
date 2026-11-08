@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -56,6 +57,10 @@ type Config struct {
 	// players cannot. By returning false in the Allow method, for example if
 	// the player has been banned, will prevent the player from joining.
 	Allower Allower
+	// PacketFunc is passed to the minecraft.ListenConfig of the default
+	// listeners and is called for every packet read from or written to a
+	// connection, including packets of the login sequence.
+	PacketFunc func(header packet.Header, payload []byte, src, dst net.Addr)
 	// AuthDisabled specifies if XBOX Live authentication should be disabled.
 	// Note that this should generally only be done for testing purposes or for
 	// local games. Allowing players to join without authentication is generally

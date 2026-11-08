@@ -408,6 +408,7 @@ func (l *listener) listenerConfig(conf Config) minecraft.ListenConfig {
 		Compression:            conf.Compression,
 		Allow:                  conf.Allower.Allow,
 		AcceptedProtocols:      conf.AcceptedProtocols,
+		PacketFunc:             conf.PacketFunc,
 	}
 	cfg.FetchResourcePacks = func(_ login.IdentityData, data login.ClientData, _ []*resource.Pack) []*resource.Pack {
 		return compatibleResourcePacks(data.GameVersion, l.resourcePacks())

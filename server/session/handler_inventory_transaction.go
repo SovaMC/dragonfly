@@ -20,7 +20,19 @@ import (
 type InventoryTransactionHandler struct {
 	lastRightClick     rightClickSignature
 	lastRightClickTime time.Time
+	// heldPlainUse is when a plain item use was last held back. Each one
+	// extends the quiet period after a form while the client keeps pressing.
+	heldPlainUse time.Time
 }
+
+const (
+	// formAwaitLimit bounds how long an unanswered form holds back plain item
+	// use. Clients show or answer a form well before then.
+	formAwaitLimit = 5 * time.Second
+	// formCloseQuiet absorbs the use a client sends again when a form closes
+	// while the use button is still down.
+	formCloseQuiet = 500 * time.Millisecond
+)
 
 type rightClickSignature struct {
 	face            int32
@@ -291,6 +303,11 @@ func (h *InventoryTransactionHandler) handleUseItemTransaction(data *protocol.Us
 		outcome = "simulation_tick_filtered"
 		return nil
 	}
+	if (data.ActionType == protocol.UseItemActionClickAir || data.ActionType == protocol.UseItemActionClickBlock && !activatable(simulationTx, pos)) &&
+		plainUse(held) && h.holdPlainUse(s, time.Now()) {
+		outcome = "form_use_held"
+		return nil
+	}
 	if data.ClientPrediction == protocol.ClientPredictionSuccess || data.ActionType == protocol.UseItemActionBreakBlock {
 		// Suppress echoing the swing animation only when the client has already predicted it locally.
 		s.swingingArm.Store(true)
@@ -335,6 +352,46 @@ func (h *InventoryTransactionHandler) handleUseItemTransaction(data *protocol.Us
 		return fmt.Errorf("unhandled UseItem ActionType %v", data.ActionType)
 	}
 	return nil
+}
+
+// holdPlainUse reports whether a plain item use must be dropped because a form
+// is open or has just closed. Bedrock queues form requests, so every use that
+// arrives before the first form shows opens another after it closes, and a
+// client whose use button was down as the form closed presses again at once.
+func (h *InventoryTransactionHandler) holdPlainUse(s *Session, now time.Time) bool {
+	if s == nil {
+		return false
+	}
+	forms, ok := s.handlers[packet.IDModalFormResponse].(*ModalFormResponseHandler)
+	if !ok {
+		return false
+	}
+	awaiting, quietSince := forms.formState(now, formAwaitLimit)
+	if h.heldPlainUse.After(quietSince) {
+		quietSince = h.heldPlainUse
+	}
+	if awaiting || (!quietSince.IsZero() && now.Sub(quietSince) < formCloseQuiet) {
+		h.heldPlainUse = now
+		return true
+	}
+	return false
+}
+
+// plainUse reports whether held has no vanilla right-click behaviour, such as a
+// server menu item, so using it only runs server handlers that may open forms.
+func plainUse(held item.Stack) bool {
+	return !held.Empty() && !repeatsOnBlock(held) && !usesLongItem(held)
+}
+
+// activatable reports whether the block at pos reacts to a click, such as a
+// door the client toggles before the server answers. Its uses are never held
+// back, so the client prediction is always resolved by the server.
+func activatable(tx *world.Tx, pos cube.Pos) bool {
+	if tx == nil {
+		return false
+	}
+	_, ok := tx.Block(pos).(block.Activatable)
+	return ok
 }
 
 // repeatedRightClick reports whether data has the exact signature emitted by
@@ -403,12 +460,29 @@ func skipSimulationTick(action, trigger uint32, c Controllable, tx *world.Tx, po
 	if _, ok := held.Item().(item.FishingRod); ok {
 		return true
 	}
+	if !held.Empty() && !repeatsOnBlock(held) {
+		// An item with no block use, such as a menu item, would otherwise run
+		// its handler again for every repeat while the button is held.
+		return true
+	}
 	if tx != nil {
 		if _, ok := tx.Block(pos).(block.IronDoor); ok {
 			return true
 		}
 	}
 	return false
+}
+
+// repeatsOnBlock reports whether held keeps a vanilla effect when its block use
+// repeats: placing blocks, item block uses such as buckets, usable items and
+// items that charge while held.
+func repeatsOnBlock(held item.Stack) bool {
+	switch held.Item().(type) {
+	case world.Block, item.UsableOnBlock, item.Usable, item.Releasable, item.Chargeable:
+		return true
+	default:
+		return false
+	}
 }
 
 func skipAirSimulationTick(held item.Stack, using bool) bool {

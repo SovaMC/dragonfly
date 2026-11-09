@@ -1784,8 +1784,8 @@ func (p *Player) SetCooldown(item world.Item, cooldown time.Duration) {
 // This generally happens for items such as throwable items like snowballs.
 func (p *Player) UseItem() {
 	if p.GameMode() == world.GameModeNativeSpectator {
-		// PocketMine-style spectators still reach HandleItemUse below so servers
-		// can handle hotbar items; vanilla use is stopped by the collision check.
+		// Faux spectator (GameModeSpectator) keeps its server-handled hotbar
+		// controls; the collision check below stops their vanilla use.
 		return
 	}
 	i, _ := p.HeldItems()

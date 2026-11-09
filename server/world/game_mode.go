@@ -150,7 +150,7 @@ func (adventure) Visible() bool             { return true }
 func (adventure) InstantPortalTravel() bool { return false }
 
 // spectator is PocketMine-style spectator: fly and noclip, invisible, but the
-// client stays on the creative game type so hotbar clicks still arrive.
+// client stays on the adventure game type so hotbar clicks still arrive.
 type spectator struct{}
 
 func (spectator) AllowsEditing() bool       { return false }

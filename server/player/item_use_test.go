@@ -261,3 +261,36 @@ func TestClientPredictedItemUseStateExcludesOnlySelf(t *testing.T) {
 		t.Fatalf("server update states first=%d second=%d", first.states, second.states)
 	}
 }
+
+// TestFauxSpectatorItemUseReachesHandler keeps hotbar controls of the clickable
+// faux spectator working in air, while native spectator still uses nothing.
+func TestFauxSpectatorItemUseReachesHandler(t *testing.T) {
+	w := world.Config{Synchronous: true}.New()
+	t.Cleanup(func() { _ = w.Close() })
+
+	if err := w.Do(func(tx *world.Tx) {
+		pos := mgl64.Vec3{0.5, 64, 0.5}
+		pl := tx.AddEntity(world.EntitySpawnOpts{Position: pos}.New(Type, Config{
+			UUID: uuid.New(), Name: "Spectator", Position: pos,
+		})).(*Player)
+		handler := &itemUseCountingHandler{}
+		pl.Handle(handler)
+		_ = pl.Inventory().SetItem(0, item.NewStack(item.Snowball{}, 16))
+
+		pl.SetGameMode(world.GameModeSpectator)
+		pl.UseItem()
+		if handler.uses != 1 {
+			t.Fatalf("faux spectator item-use handler calls = %d, want 1", handler.uses)
+		}
+		if held, _ := pl.HeldItems(); held.Count() != 16 {
+			t.Fatalf("faux spectator used the item itself: %d snowballs left", held.Count())
+		}
+		pl.SetGameMode(world.GameModeNativeSpectator)
+		pl.UseItem()
+		if handler.uses != 1 {
+			t.Fatalf("native spectator reached the item-use handler")
+		}
+	}).Wait(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}

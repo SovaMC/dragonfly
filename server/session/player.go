@@ -665,10 +665,15 @@ func (s *Session) SendForm(f form.Form) {
 		s.conf.Log.Debug("SendForm: more than 10 active forms: dropping an existing one")
 		for k := range h.forms {
 			delete(h.forms, k)
+			delete(h.sent, k)
 			break
 		}
 	}
 	h.forms[id] = f
+	if h.sent == nil {
+		h.sent = make(map[uint32]time.Time)
+	}
+	h.sent[id] = time.Now()
 	h.mu.Unlock()
 
 	s.writePacket(&packet.ModalFormRequest{
@@ -680,6 +685,12 @@ func (s *Session) SendForm(f form.Form) {
 // CloseForm closes any forms that the player currently has open. If the player has no forms open, nothing
 // happens.
 func (s *Session) CloseForm() {
+	h := s.handlers[packet.IDModalFormResponse].(*ModalFormResponseHandler)
+	h.mu.Lock()
+	// The client may not answer forms the server closed, so they no longer
+	// hold back item use. A late answer still reaches the form.
+	clear(h.sent)
+	h.mu.Unlock()
 	s.writePacket(&packet.ClientBoundCloseForm{})
 }
 
@@ -811,8 +822,8 @@ func abilityValues(mode world.GameMode, flying bool) uint32 {
 
 // gameModeAbilities returns the base ability values advertised to the client.
 // PocketMine-style spectator deliberately differs from native Bedrock spectator:
-// it retains the creative client game type and infinite-resource bit so hotbar
-// controls keep producing requests, while interaction capabilities remain off.
+// it retains a non-spectator client game type and the infinite-resource bit so
+// hotbar controls keep producing requests, while interaction capabilities remain off.
 func gameModeAbilities(mode world.GameMode) uint32 {
 	abilities := uint32(0)
 	if mode.AllowsFlying() {
@@ -1699,9 +1710,11 @@ func gameTypeFromMode(mode world.GameMode) int32 {
 	case 2:
 		return packet.GameTypeAdventure
 	case 3:
-		// spec: PocketMine-style spectator uses the creative game type so the
+		// spec: PocketMine-style spectator keeps a non-spectator game type so the
 		// hotbar still sends item-use packets. Noclip/fly come from abilities.
-		return packet.GameTypeCreative
+		// PocketMine sends creative; adventure keeps the item-use path of the
+		// survival-type lobby, whose menu items work in air on current clients.
+		return packet.GameTypeAdventure
 	case 4:
 		return packet.GameTypeSpectator
 	default:

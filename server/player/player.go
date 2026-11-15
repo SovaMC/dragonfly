@@ -118,6 +118,10 @@ type playerData struct {
 	once sync.Once
 
 	prevWorld *world.World
+
+	// positions holds recent positions so that block placement by another
+	// player can be judged against what that player could see.
+	positions positionHistory
 }
 
 // Player is an implementation of a player entity. It has methods that implement the behaviour that players
@@ -2487,6 +2491,7 @@ func (p *Player) obstructedPos(pos cube.Pos, b world.Block) (obstructed, selfOnl
 		blockBoxes[i] = box.Translate(pos.Vec3())
 	}
 
+	since := positionClock().Add(-p.placementViewDelay())
 	for e := range p.tx.EntitiesWithin(cube.Box(-3, -3, -3, 3, 3, 3).Translate(pos.Vec3())) {
 		if !world.EntityHasCollision(e) {
 			continue
@@ -2499,16 +2504,56 @@ func (p *Player) obstructedPos(pos cube.Pos, b world.Block) (obstructed, selfOnl
 			if g, ok := e.(interface{ GameMode() world.GameMode }); ok && g.GameMode() == world.GameModeSpectator {
 				continue
 			}
-			if cube.AnyIntersections(blockBoxes, t.BBox(e).Translate(e.Position()).Grow(-1e-4)) {
-				obstructed = true
-				if e.H() == p.handle {
-					continue
-				}
-				return true, false
+			if !cube.AnyIntersections(blockBoxes, t.BBox(e).Translate(e.Position()).Grow(-1e-4)) {
+				continue
 			}
+			if e.H() == p.handle {
+				// The server applies the client's movement a tick after the
+				// click, so only the client knows whether the block clears it.
+				if !p.session().ClientPredictedBlockUse() {
+					obstructed = true
+				}
+				continue
+			}
+			if other, ok := e.(*Player); ok && other.placementUnseen(blockBoxes, since) {
+				continue
+			}
+			return true, false
 		}
 	}
 	return obstructed, true
+}
+
+const (
+	// placementViewAllowance covers the time a client shows another player
+	// behind the server beyond its round trip: three ticks of entity
+	// interpolation, plus one flush each at the server and at a proxy.
+	placementViewAllowance = 250 * time.Millisecond
+	// maxPlacementRoundTrip bounds how far back a lagging placer is believed.
+	maxPlacementRoundTrip = time.Second
+)
+
+// placementViewDelay returns how far behind the server the player's client
+// shows other players.
+func (p *Player) placementViewDelay() time.Duration {
+	return min(2*p.Latency(), maxPlacementRoundTrip) + placementViewAllowance
+}
+
+// placementUnseen reports whether a block with the given boxes, which overlaps
+// the player now, may still be placed by someone who sees the player as they
+// were at since: the player stood clear of it at some point after since, and
+// the block would not enclose the player's head.
+func (p *Player) placementUnseen(blockBoxes []cube.BBox, since time.Time) bool {
+	eye := entity.EyePosition(p)
+	for _, box := range blockBoxes {
+		if box.Vec3Within(eye) {
+			return false
+		}
+	}
+	bbox := p.H().Type().BBox(p).Grow(-1e-4)
+	return p.positions.anyClearSince(since, func(pos mgl64.Vec3) bool {
+		return !cube.AnyIntersections(blockBoxes, bbox.Translate(pos))
+	})
 }
 
 // BreakBlock makes the player break a block in the world at a position passed. If the player is unable to
@@ -2676,6 +2721,9 @@ func (p *Player) teleport(pos mgl64.Vec3) {
 	}
 	p.data.Pos = pos
 	p.data.Vel = mgl64.Vec3{}
+	// Viewers jump straight to the new position, so nothing before it counts.
+	p.positions.reset()
+	p.positions.add(positionClock(), pos)
 	p.ResetFallDistance()
 }
 
@@ -2720,6 +2768,7 @@ func (p *Player) Move(deltaPos mgl64.Vec3, deltaYaw, deltaPitch float64) {
 
 	p.data.Pos = res
 	p.data.Rot = resRot
+	p.positions.add(positionClock(), res)
 	if deltaPos.Len() <= 3 {
 		// Only update velocity if the player is not moving too fast to prevent potential OOMs.
 		p.data.Vel = deltaPos

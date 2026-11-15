@@ -95,6 +95,7 @@ type Session struct {
 	swingingArm                    atomic.Bool
 	changingSlot                   atomic.Bool
 	clientItemUsePrediction        atomic.Pointer[clientItemUsePrediction]
+	clientPredictedBlockUse        atomic.Bool
 	nextItemUseFlush               time.Time // Accessed only by the controllable's world owner.
 	itemUseTraceSequence           atomic.Uint64
 	itemUseTraceLimiter            itemUseTraceLimiter

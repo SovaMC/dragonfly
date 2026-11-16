@@ -176,7 +176,12 @@ func (s *Session) ViewEntity(e world.Entity) {
 				}},
 			},
 		})
-		if !actualPlayer {
+		if actualPlayer {
+			// The client keeps the skin of an entry it already lists when the
+			// Add repeats, and that entry carries the join skin. Only PlayerSkin
+			// puts a later skin (cosmetics, a skin change) on the new actor.
+			s.writePacket(&packet.PlayerSkin{UUID: v.UUID(), Skin: entry.Skin})
+		} else {
 			s.writePacket(&packet.PlayerList{Entries: []protocol.PlayerListEntry{{
 				ActionType: protocol.PlayerListActionRemove,
 				UUID:       v.UUID(),

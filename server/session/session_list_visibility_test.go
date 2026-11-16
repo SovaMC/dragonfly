@@ -254,3 +254,55 @@ func TestPlayerReplacementDuringSpawnPreparation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The client keeps the skin of a player-list entry it already has when another
+// Add arrives for the same UUID, and AddPlayer draws that entry. A registered
+// player's list entry carries its join skin, so a later skin (cosmetics, a
+// skin change) only reaches a viewer that spawns it again through PlayerSkin.
+func TestRegisteredPlayerSpawnSendsCurrentSkin(t *testing.T) {
+	w := world.Config{Synchronous: true}.New()
+	t.Cleanup(func() { _ = w.Close() })
+	if err := w.Do(func(tx *world.Tx) {
+		observer, _ := visibilitySession(tx, t)
+		observer.chunkLoader.Load(tx, 32)
+		defer observer.chunkLoader.Close(tx)
+		sessions.Add(observer)
+		defer sessions.Remove(observer, nil)
+		joined := playerListTestSession(uuid.New())
+		joined.joinSkin.FullID = "join-skin"
+		sessions.Add(joined)
+		defer sessions.Remove(joined, nil)
+		subject := tx.AddEntity(joined.ent).(*visibilityActor)
+		current := skin.New(64, 64)
+		current.FullID = "current-skin"
+		subject.data.Data.(*visibilityActorData).skin = &current
+		drainVisibilityPackets(observer)
+
+		// A world change or a respawn shows the player again.
+		observer.HideEntity(subject)
+		drainVisibilityPackets(observer)
+		observer.ViewEntity(subject)
+		packets := drainVisibilityPackets(observer)
+		spawned := false
+		for _, raw := range packets {
+			switch pk := raw.(type) {
+			case *packet.AddPlayer:
+				spawned = spawned || pk.UUID == subject.UUID()
+			case *packet.PlayerSkin:
+				if pk.UUID != subject.UUID() {
+					continue
+				}
+				if !spawned {
+					t.Fatal("PlayerSkin arrived before the actor it changes")
+				}
+				if pk.Skin.FullID != "current-skin" {
+					t.Fatalf("respawn sent skin %q, want the current skin", pk.Skin.FullID)
+				}
+				return
+			}
+		}
+		t.Fatal("respawn of a registered player sent no PlayerSkin with its current skin")
+	}).Wait(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}

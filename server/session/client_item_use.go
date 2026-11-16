@@ -44,6 +44,13 @@ func (s *Session) ClientPredictedItemUse() bool {
 	return s.clientItemUsePrediction.Load() != nil
 }
 
+// ClientPredictedBlockUse reports whether the block click being handled is one
+// the client reported it had already carried out locally, such as a block it
+// has already drawn as placed.
+func (s *Session) ClientPredictedBlockUse() bool {
+	return s != Nop && s.clientPredictedBlockUse.Load()
+}
+
 func (s *Session) predictedHeldItemMatches(slot int, after item.Stack) bool {
 	prediction := s.clientItemUsePrediction.Load()
 	return prediction != nil && prediction.matchHeld && prediction.slot == slot &&

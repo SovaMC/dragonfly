@@ -327,7 +327,9 @@ func (h *InventoryTransactionHandler) handleUseItemTransaction(data *protocol.Us
 		c.BreakBlock(pos)
 		outcome = "break_block"
 	case protocol.UseItemActionClickBlock:
+		s.clientPredictedBlockUse.Store(data.ClientPrediction == protocol.ClientPredictionSuccess)
 		handled := c.UseItemOnBlock(pos, cube.Face(data.BlockFace), vec32To64(data.ClickedPosition))
+		s.clientPredictedBlockUse.Store(false)
 		if consumable {
 			outcome = "consumable_block_use"
 			break

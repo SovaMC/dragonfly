@@ -21,7 +21,7 @@ type Ladder struct {
 
 // NeighbourUpdateTick ...
 func (l Ladder) NeighbourUpdateTick(pos, _ cube.Pos, tx *world.Tx) {
-	if _, ok := tx.Block(pos.Side(l.Facing.Face().Opposite())).(LightDiffuser); ok {
+	if !ladderSupport(pos.Side(l.Facing.Face().Opposite()), tx) {
 		breakBlock(l, pos, tx)
 	}
 }
@@ -35,10 +35,10 @@ func (l Ladder) UseOnBlock(pos cube.Pos, face cube.Face, _ mgl64.Vec3, tx *world
 	if face == cube.FaceUp || face == cube.FaceDown {
 		return false
 	}
-	if _, ok := tx.Block(pos.Side(face.Opposite())).(LightDiffuser); ok {
+	if !ladderSupport(pos.Side(face.Opposite()), tx) {
 		found := false
 		for _, i := range []cube.Face{cube.FaceSouth, cube.FaceNorth, cube.FaceEast, cube.FaceWest} {
-			if diffuser, ok := tx.Block(pos.Side(i)).(LightDiffuser); !ok || diffuser.LightDiffusionLevel() == 15 {
+			if ladderSupport(pos.Side(i), tx) {
 				found = true
 				face = i.Opposite()
 				break
@@ -52,6 +52,24 @@ func (l Ladder) UseOnBlock(pos cube.Pos, face cube.Face, _ mgl64.Vec3, tx *world
 
 	place(tx, pos, l, user, ctx)
 	return placed(ctx)
+}
+
+// ladderSupport reports whether a ladder may hang on the block at pos. Opaque blocks qualify, and so does any
+// block whose single collision box fills the block's footprint, such as leaves, glass, dirt paths, farmland and
+// soul sand. Slabs, stairs, fences and other partial shapes do not.
+func ladderSupport(pos cube.Pos, tx *world.Tx) bool {
+	b := tx.Block(pos)
+	if diffuser, ok := b.(LightDiffuser); !ok || diffuser.LightDiffusionLevel() == 15 {
+		return true
+	}
+	boxes := b.Model().BBox(pos, tx)
+	if len(boxes) != 1 {
+		return false
+	}
+	const epsilon = 1e-6
+	minimum, maximum := boxes[0].Min(), boxes[0].Max()
+	return minimum.X() <= epsilon && minimum.Y() <= epsilon && minimum.Z() <= epsilon &&
+		maximum.X() >= 1-epsilon && maximum.Z() >= 1-epsilon && maximum.Y() >= 0.875-epsilon
 }
 
 // EntityInside ...

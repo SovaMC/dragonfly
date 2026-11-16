@@ -198,7 +198,7 @@ func skinToProtocol(s skin.Skin) protocol.Skin {
 		PersonaPieces:             slices.Clone(s.PersonaPieces),
 		PieceTintColours:          slices.Clone(s.PieceTintColours),
 		Animations:                animations,
-		Trusted:                   true,
+		Trusted:                   protocol.Option(true),
 		OverrideAppearance:        true,
 		GeometryDataEngineVersion: slices.Clone(geometryVersion),
 		ProfileHash:               s.ProfileHash,

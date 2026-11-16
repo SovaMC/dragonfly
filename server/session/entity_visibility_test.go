@@ -31,16 +31,23 @@ type visibilityActorData struct {
 	mode      world.GameMode
 	armour    *inventory.Armour
 	invisible bool
+	// skin, when set, replaces the blank skin the actor otherwise reports.
+	skin *skin.Skin
 }
 
-func (a *visibilityActor) H() *world.EntityHandle   { return a.handle }
-func (a *visibilityActor) Tx() *world.Tx            { return a.tx }
-func (a *visibilityActor) Position() mgl64.Vec3     { return a.data.Pos }
-func (a *visibilityActor) Rotation() cube.Rotation  { return a.data.Rot }
-func (a *visibilityActor) UUID() uuid.UUID          { return a.handle.UUID() }
-func (a *visibilityActor) Name() string             { return a.data.Name }
-func (a *visibilityActor) NameTag() string          { return a.data.Name }
-func (*visibilityActor) Skin() skin.Skin            { return skin.New(64, 64) }
+func (a *visibilityActor) H() *world.EntityHandle  { return a.handle }
+func (a *visibilityActor) Tx() *world.Tx           { return a.tx }
+func (a *visibilityActor) Position() mgl64.Vec3    { return a.data.Pos }
+func (a *visibilityActor) Rotation() cube.Rotation { return a.data.Rot }
+func (a *visibilityActor) UUID() uuid.UUID         { return a.handle.UUID() }
+func (a *visibilityActor) Name() string            { return a.data.Name }
+func (a *visibilityActor) NameTag() string         { return a.data.Name }
+func (a *visibilityActor) Skin() skin.Skin {
+	if current := a.data.Data.(*visibilityActorData).skin; current != nil {
+		return *current
+	}
+	return skin.New(64, 64)
+}
 func (a *visibilityActor) GameMode() world.GameMode { return a.data.Data.(*visibilityActorData).mode }
 func (a *visibilityActor) Armour() *inventory.Armour {
 	return a.data.Data.(*visibilityActorData).armour
